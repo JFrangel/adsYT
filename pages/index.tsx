@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TimerButton from '@/components/TimerButton';
 import { FireIcon, LockIcon, AnnouncementIcon, ArrowIcon } from '@/components/Icons';
+import HighPerformanceAd from '@/components/HighPerformanceAd';
 import Head from 'next/head';
 
 export default function Home() {
@@ -71,21 +72,10 @@ export default function Home() {
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
             <div className="text-purple-200 flex items-start gap-3">
               <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
-              <div>
+              <div className="w-full">
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
                 <div className="mt-4 sm:mt-6">
-                  <script dangerouslySetInnerHTML={{
-                    __html: `
-                      atOptions = {
-                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
-                        'format' : 'iframe',
-                        'height' : 250,
-                        'width' : 300,
-                        'params' : {}
-                      };
-                    `
-                  }} />
-                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
+                  <HighPerformanceAd className="bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl border border-gray-700/50" />
                 </div>
               </div>
             </div>

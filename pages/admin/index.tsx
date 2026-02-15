@@ -43,12 +43,14 @@ export default function AdminPanel() {
       const response = await axios.get('/api/admin/check');
       if (response.data.authenticated) {
         setAuthenticated(true);
-        fetchLinks();
-        fetchFiles();
+        // Fetch both in parallel
+        await Promise.all([fetchLinks(), fetchFiles()]);
       } else {
         router.push('/admin/login');
       }
     } catch (error) {
+      console.error('Auth check error:', error);
+      setLoading(false);
       router.push('/admin/login');
     }
   };

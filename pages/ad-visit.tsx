@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
+import HighPerformanceAd from '@/components/HighPerformanceAd';
 
 const REQUIRED_SECONDS = 7;
 
@@ -216,19 +217,8 @@ export default function AdVisit() {
                 <p className="text-gray-400 text-xs mb-4 uppercase tracking-wider">Anuncio Adicional</p>
                 
                 {/* Ad container - responsive */}
-                <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-4 border border-gray-700/50 min-h-[250px] sm:min-h-[300px] flex items-center justify-center">
-                  <script dangerouslySetInnerHTML={{
-                    __html: `
-                      atOptions = {
-                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
-                        'format' : 'iframe',
-                        'height' : 250,
-                        'width' : 300,
-                        'params' : {}
-                      };
-                    `
-                  }} />
-                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
+                <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-4 border border-gray-700/50">
+                  <HighPerformanceAd />
                 </div>
               </div>
 

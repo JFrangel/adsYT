@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
 import { FileIcon, DownloadIcon, AnnouncementIcon, CheckIcon, FolderIcon, ArrowIcon } from '@/components/Icons';
+import HighPerformanceAd from '@/components/HighPerformanceAd';
 
 interface FileItem {
   id: string;
@@ -111,21 +112,10 @@ export default function Entry3() {
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
             <div className="text-green-200 flex items-start gap-3">
               <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
-              <div>
+              <div className="w-full">
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
                 <div className="mt-4 sm:mt-6">
-                  <script dangerouslySetInnerHTML={{
-                    __html: `
-                      atOptions = {
-                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
-                        'format' : 'iframe',
-                        'height' : 250,
-                        'width' : 300,
-                        'params' : {}
-                      };
-                    `
-                  }} />
-                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
+                  <HighPerformanceAd className="bg-gradient-to-r from-gray-800/50 to-green-900/50 rounded-xl border border-gray-700/50" />
                 </div>
               </div>
             </div>
