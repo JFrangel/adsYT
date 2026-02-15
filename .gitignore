@@ -25,6 +25,10 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Files storage (binary files not versioned)
+archivos/
+files/
+
 # Vercel
 .vercel
 

@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createGitHubService } from '@/lib/github';
+import fs from 'fs';
+import path from 'path';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { file } = req.query;
@@ -43,33 +45,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     }
 
-    // GET request - download file from GitHub using API
+    // GET request - download file from local storage
     try {
-      console.log('Fetching file:', `files/${fileItem.filename}`);
-      const fileResponse = await github.getFile(`files/${fileItem.filename}`);
+      // Build path to archivos directory
+      const archivosDir = path.join(process.cwd(), 'archivos');
+      const filePath = path.join(archivosDir, fileItem.filename);
       
-      if (!fileResponse) {
-        console.error('File not found in GitHub:', fileItem.filename);
-        return res.status(404).json({ error: 'File not found in repository' });
+      // Security: ensure file path is within archivos directory
+      const normalizedPath = path.normalize(filePath);
+      if (!normalizedPath.startsWith(archivosDir)) {
+        console.error('Security violation: attempted to access file outside archivos directory');
+        return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Decode the base64 content from GitHub
-      const fileBuffer = Buffer.from(fileResponse.content, 'base64');
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error('File not found on disk:', fileItem.filename);
+        return res.status(404).json({ error: 'File not available for download' });
+      }
 
+      // Get file info
+      const stats = fs.statSync(filePath);
+      
       // Set headers
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
-      res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('Content-Length', stats.size);
 
-      // Send the file
-      res.send(fileBuffer);
+      // Stream file to response
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+      
+      stream.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Error reading file' });
+        }
+      });
     } catch (downloadError: any) {
-      console.error('GitHub download error:', {
+      console.error('Download error:', {
         filename: fileItem.filename,
-        status: downloadError.response?.status,
         message: downloadError.message,
       });
-      return res.status(500).json({ error: 'Failed to download file from GitHub' });
+      return res.status(500).json({ error: 'Failed to download file' });
     }
   } catch (error: any) {
     console.error('Download error:', {
@@ -79,4 +97,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Error downloading file: ' + error.message });
   }
 }
+
 
