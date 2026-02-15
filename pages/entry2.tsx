@@ -122,7 +122,7 @@ export default function Entry2() {
                 transform hover:scale-[1.02] active:scale-95
                 transition-all duration-300 flex items-center justify-center gap-2"
             >
-              <AnnouncementIcon className="w-5 h-5" animate />
+              
               Ver Anuncio
             </button>
           )}

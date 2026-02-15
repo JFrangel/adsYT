@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+import { getClicks, getLastUsedIndex } from '@/lib/click-cache';
 
 interface LinkConfig {
   id: string;
@@ -45,7 +46,7 @@ function getLinksConfig(): LinksData {
             id: 'monetag',
             name: 'Monetag',
             url: 'https://omg10.com/4/9722913',
-            clicks: 0,
+            clicks: getClicks('monetag'),
             enabled: true,
             active: true,
             createdAt: Date.now(),
@@ -55,7 +56,7 @@ function getLinksConfig(): LinksData {
             id: 'adsterra',
             name: 'AdSterra',
             url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-            clicks: 0,
+            clicks: getClicks('adsterra'),
             enabled: true,
             active: false,
             createdAt: Date.now(),
@@ -85,7 +86,7 @@ function getLinksConfig(): LinksData {
           id: 'monetag',
           name: 'Monetag',
           url: 'https://omg10.com/4/9722913',
-          clicks: 0,
+          clicks: getClicks('monetag'),
           enabled: true,
           active: true,
           createdAt: Date.now(),
@@ -95,7 +96,7 @@ function getLinksConfig(): LinksData {
           id: 'adsterra',
           name: 'AdSterra',
           url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-          clicks: 0,
+          clicks: getClicks('adsterra'),
           enabled: true,
           active: false,
           createdAt: Date.now(),
@@ -123,6 +124,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // Obtener configuración de links
     try {
       const config = getLinksConfig();
+      
+      // Meramente los clicks del caché en memoria con la configuración del archivo
+      config.links = config.links.map(link => ({
+        ...link,
+        clicks: getClicks(link.id) || link.clicks
+      }));
+      
       return res.status(200).json(config);
     } catch (error: any) {
       return res.status(500).json({ error: 'Error reading links config' });

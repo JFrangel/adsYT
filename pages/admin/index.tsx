@@ -32,6 +32,7 @@ export default function AdminPanel() {
   const [mounted, setMounted] = useState(false);
   const [links, setLinks] = useState<LinkConfig[]>([]);
   const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
+  const [savingCheckpoint, setSavingCheckpoint] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -146,6 +147,24 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error deleting link:', error);
       alert('Error al eliminar link');
+    }
+  };
+
+  const saveCheckpoint = async () => {
+    if (!confirm('¿Guardar checkpoint de clicks actual a GitHub? Se guardará un commit con el estado actual.')) return;
+    
+    setSavingCheckpoint(true);
+    try {
+      const response = await axios.post('/api/admin/save-checkpoint');
+      alert(`✅ Checkpoint guardado: Monetag ${response.data.clicks.monetag} | AdSterra ${response.data.clicks.adsterra}`);
+      // Refrescar datos para mostrar confirmación
+      await fetchLinks();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || error.message;
+      alert(`❌ Error al guardar checkpoint: ${errorMsg}\n\nVerifica que GITHUB_TOKEN esté configurado en las variables de entorno.`);
+      console.error('Error saving checkpoint:', error);
+    } finally {
+      setSavingCheckpoint(false);
     }
   };
 
@@ -422,7 +441,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Add New Link Button */}
-            <div className="mb-6">
+            <div className="mb-6 flex gap-3 flex-wrap">
               <button
                 onClick={addNewLink}
                 className="px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
@@ -431,6 +450,17 @@ export default function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Agregar Nuevo Link
+              </button>
+              
+              <button
+                onClick={saveCheckpoint}
+                disabled={savingCheckpoint}
+                className="px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                {savingCheckpoint ? 'Guardando...' : 'Guardar Checkpoint'}
               </button>
             </div>
 

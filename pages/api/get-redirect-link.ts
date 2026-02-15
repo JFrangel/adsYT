@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+import { getClicks, incrementClicks, getLastUsedIndex, setLastUsedIndex, initializeFromCheckpoint } from '@/lib/click-cache';
 
 interface LinkConfig {
   id: string;
@@ -74,7 +75,21 @@ function getLinksConfig(): LinksData {
     }
     
     const data = fs.readFileSync(configFile, 'utf-8');
-    return JSON.parse(data);
+    const config = JSON.parse(data);
+    
+    // Apply in-memory click counts
+    config.links = config.links.map((link: LinkConfig) => ({
+      ...link,
+      clicks: getClicks(link.id) || link.clicks
+    }));
+    
+    // Apply last used index from cache
+    const cachedIndex = getLastUsedIndex();
+    if (cachedIndex !== undefined) {
+      config.lastUsedIndex = cachedIndex;
+    }
+    
+    return config;
   } catch (error) {
     console.error('Error reading config file:', error);
     // Retornar configuración por defecto si hay error
@@ -85,7 +100,7 @@ function getLinksConfig(): LinksData {
           id: 'monetag',
           name: 'Monetag',
           url: 'https://omg10.com/4/9722913',
-          clicks: 0,
+          clicks: getClicks('monetag'),
           enabled: true,
           active: true,
           createdAt: Date.now(),
@@ -95,14 +110,14 @@ function getLinksConfig(): LinksData {
           id: 'adsterra',
           name: 'AdSterra',
           url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-          clicks: 0,
+          clicks: getClicks('adsterra'),
           enabled: true,
           active: false,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         }
       ],
-      lastUsedIndex: undefined
+      lastUsedIndex: getLastUsedIndex()
     };
   }
 }
@@ -118,10 +133,13 @@ function saveLinksConfig(config: LinksData) {
   }
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Inicializar desde checkpoint en el primer request
+  await initializeFromCheckpoint();
 
   try {
     const config = getLinksConfig();
@@ -139,25 +157,29 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       selectedLink = activeLink || enabledLinks[0];
     } else {
       // Modo alternate: alterna entre los links habilitados
-      const lastIndex = config.lastUsedIndex ?? -1;
+      const lastIndex = getLastUsedIndex() ?? -1;
       const nextIndex = (lastIndex + 1) % enabledLinks.length;
       selectedLink = enabledLinks[nextIndex];
       
-      // Guardar el índice del link usado (relativo a enabledLinks)
-      config.lastUsedIndex = nextIndex;
+      // Guardar el índice del link usado en memoria
+      setLastUsedIndex(nextIndex);
     }
 
-    // Incrementar contador de clics
-    const linkInConfig = config.links.find(l => l.id === selectedLink.id);
-    if (linkInConfig) {
-      linkInConfig.clicks += 1;
-      linkInConfig.updatedAt = Date.now();
-    }
+    // Incrementar contador de clics en memoria
+    const currentClicks = await incrementClicks(selectedLink.id);
+    
+    console.log(`Click tracked for ${selectedLink.name}: ${currentClicks} total clicks`);
 
-    // Intentar guardar cambios (puede fallar en sistem readonly como Netlify)
-    const saved = saveLinksConfig(config);
-    if (!saved) {
-      console.warn('Stats not saved (read-only filesystem). Link will still work.');
+    // Intentar guardar cambios en archivo (puede fallar en readonly filesystem)
+    try {
+      const linkInConfig = config.links.find(l => l.id === selectedLink.id);
+      if (linkInConfig) {
+        linkInConfig.clicks = getClicks(selectedLink.id);
+        linkInConfig.updatedAt = Date.now();
+      }
+      saveLinksConfig(config);
+    } catch (saveError) {
+      console.warn('Could not save to file, using in-memory cache only');
     }
 
     return res.status(200).json({
