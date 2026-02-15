@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { CheckIcon, AnnouncementIcon, LockIcon } from '@/components/Icons';
+import HighPerformanceAd from '@/components/HighPerformanceAd';
 import Head from 'next/head';
 
 export default function Entry2() {
@@ -82,15 +83,33 @@ export default function Entry2() {
             Haz clic en el botón de abajo para comenzar.
           </p>
 
+          {/* Ad before status */}
+          <div className="pt-4 border-t border-gray-700/50">
+            <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
+            <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-3 border border-gray-700/50">
+              <HighPerformanceAd />
+            </div>
+          </div>
+
           {/* Status message */}
           {canContinue ? (
-            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 animate-fadeIn flex items-start gap-3">
-              <CheckIcon className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" animate />
-              <div className="text-left">
-                <p className="text-green-400 font-semibold text-lg">¡Anuncio completado!</p>
-                <p className="text-green-300 text-sm mt-1">Ya puedes continuar al siguiente paso.</p>
+            <>
+              <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 animate-fadeIn flex items-start gap-3">
+                <CheckIcon className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" animate />
+                <div className="text-left">
+                  <p className="text-green-400 font-semibold text-lg">¡Anuncio completado!</p>
+                  <p className="text-green-300 text-sm mt-1">Ya puedes continuar al siguiente paso.</p>
+                </div>
               </div>
-            </div>
+
+              {/* Ad in success state */}
+              <div className="pt-4 border-t border-gray-700/50">
+                <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
+                <div className="w-full bg-gradient-to-r from-gray-800/50 to-green-900/50 rounded-xl p-3 border border-gray-700/50">
+                  <HighPerformanceAd />
+                </div>
+              </div>
+            </>
           ) : (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
               <p className="text-yellow-300 text-sm">
@@ -115,15 +134,16 @@ export default function Entry2() {
           )}
 
           {/* Continue button - always visible but locked until completed */}
-          <button
-            onClick={handleContinue}
-            disabled={!canContinue}
-            className={`w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 flex items-center justify-center gap-2
-              ${canContinue
-                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-[1.02] active:scale-95 cursor-pointer'
-                : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
-              }`}
-          >
+          <div className="flex justify-center w-full">
+            <button
+              onClick={handleContinue}
+              disabled={!canContinue}
+              className={`w-full max-w-md py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 flex items-center justify-center gap-2
+                ${canContinue
+                  ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-[1.02] active:scale-95 cursor-pointer'
+                  : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
+                }`}
+            >
             {canContinue ? (
               <>
                 Continuar a Paso 3
@@ -136,6 +156,7 @@ export default function Entry2() {
               </>
             )}
           </button>
+          </div>
 
           {/* Back link */}
           <button
