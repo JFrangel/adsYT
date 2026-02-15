@@ -55,24 +55,36 @@ export default function Entry3() {
 
   const handleDownload = async (file: FileItem) => {
     try {
+      console.log('🎯 Download started for:', file.name);
+      
       // Para Android/iOS: abrir ventana del anuncio INMEDIATAMENTE (síncrono con el click)
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
       // Abrir descarga también inmediatamente
       window.open(`/api/download?file=${file.id}`, '_blank');
       
-      // Track download (no bloqueante)
-      axios.post(`/api/download?file=${file.id}`).catch(console.error);
+      // Track download (no bloqueante) - esto solo cuenta descargas, NO clicks de ads
+      axios.post(`/api/download?file=${file.id}`)
+        .then(() => console.log('✅ Download tracked'))
+        .catch(error => console.error('❌ Error tracking download:', error));
       
       try {
-        // Obtener URL del anuncio
+        // Obtener URL del anuncio - ESTO sí trackea clicks de ads
+        console.log('🔄 Getting ad link...');
         const response = await axios.get('/api/get-redirect-link');
         const adUrl = response.data.url;
+        
+        console.log('✅ Ad link obtained:', { 
+          url: adUrl, 
+          linkId: response.data.linkId, 
+          linkName: response.data.linkName 
+        });
         
         // Esperar 2 segundos para que la descarga se inicie completamente
         setTimeout(() => {
           // Si la ventana sigue abierta, redirigir a la URL real
           if (adWindow && !adWindow.closed) {
+            console.log('🚀 Redirecting ad window to:', response.data.linkName);
             adWindow.location.href = adUrl;
           } else {
             // Si el popup fue bloqueado, usar fallback
@@ -83,7 +95,7 @@ export default function Entry3() {
         }, 2000); // 2 segundos para asegurar que la descarga se inicie
         
       } catch (error) {
-        console.error('Error getting ad link:', error);
+        console.error('❌ Error getting ad link:', error);
         // Cerrar ventana vacía si hay error
         if (adWindow && !adWindow.closed) {
           adWindow.close();
@@ -95,7 +107,7 @@ export default function Entry3() {
       }
       
     } catch (error) {
-      console.error('Error in download process:', error);
+      console.error('❌ Error in download process:', error);
       showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
     }
   };

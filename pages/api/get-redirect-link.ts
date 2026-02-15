@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
-import { getClicks, incrementClicks, getLastUsedIndex, setLastUsedIndex, initializeFromCheckpoint } from '@/lib/click-cache';
+import { getClicks, incrementClicks, getLastUsedIndex, setLastUsedIndex, initializeFromCheckpoint, clickCache } from '@/lib/click-cache';
 
 interface LinkConfig {
   id: string;
@@ -168,7 +168,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Incrementar contador de clics en memoria
     const currentClicks = await incrementClicks(selectedLink.id);
     
-    console.log(`Click tracked for ${selectedLink.name}: ${currentClicks} total clicks`);
+    console.log(`🎯 Click tracked for ${selectedLink.name} (${selectedLink.id}): ${currentClicks} total clicks`);
+    console.log(`📊 Current cache state:`, {
+      monetag: getClicks('monetag'),
+      adsterra: getClicks('adsterra'),
+      allLinks: Object.keys(clickCache).reduce((acc, key) => {
+        acc[key] = getClicks(key);
+        return acc;
+      }, {} as any)
+    });
 
     // Intentar guardar cambios en archivo (puede fallar en readonly filesystem)
     try {
