@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createGitHubService } from '@/lib/github';
-import axios from 'axios';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { file } = req.query;
@@ -44,22 +43,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     }
 
-    // GET request - redirect to raw GitHub URL
-    const rawUrl = github.getRawUrl(`files/${fileItem.filename}`);
-    
-    // Stream the file from GitHub
-    const response = await axios.get(rawUrl, {
-      responseType: 'stream',
-    });
+    // GET request - download file from GitHub using API
+    try {
+      console.log('Fetching file:', `files/${fileItem.filename}`);
+      const fileResponse = await github.getFile(`files/${fileItem.filename}`);
+      
+      if (!fileResponse) {
+        console.error('File not found in GitHub:', fileItem.filename);
+        return res.status(404).json({ error: 'File not found in repository' });
+      }
 
-    // Set headers
-    res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
+      // Decode the base64 content from GitHub
+      const fileBuffer = Buffer.from(fileResponse.content, 'base64');
 
-    // Pipe the stream
-    response.data.pipe(res);
+      // Set headers
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+
+      // Send the file
+      res.send(fileBuffer);
+    } catch (downloadError: any) {
+      console.error('GitHub download error:', {
+        filename: fileItem.filename,
+        status: downloadError.response?.status,
+        message: downloadError.message,
+      });
+      return res.status(500).json({ error: 'Failed to download file from GitHub' });
+    }
   } catch (error: any) {
-    console.error('Download error:', error);
-    return res.status(500).json({ error: 'Error downloading file' });
+    console.error('Download error:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ error: 'Error downloading file: ' + error.message });
   }
 }
+
