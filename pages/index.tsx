@@ -30,7 +30,7 @@ export default function Home() {
         <title>Free Fire - archivos</title>
       </Head>
       
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-10 sm:top-20 left-5 sm:left-10 w-48 sm:w-72 h-48 sm:h-72 bg-purple-500/30 rounded-full blur-3xl animate-float"></div>

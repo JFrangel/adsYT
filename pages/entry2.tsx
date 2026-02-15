@@ -48,7 +48,7 @@ export default function Entry2() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-400"></div>
       </div>
     );
@@ -60,7 +60,7 @@ export default function Entry2() {
         <title>Paso 2 - Ver Anuncio | Free Fire Portal</title>
       </Head>
 
-      <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
+      <main className="min-h-[100dvh] bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
         <div className="glass-card w-full max-w-lg p-6 sm:p-8 text-center space-y-6">
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 text-sm text-gray-400">

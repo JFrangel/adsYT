@@ -38,7 +38,7 @@ export default function AdminLogin() {
         <title>Admin Login</title>
       </Head>
       
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-20 w-48 sm:w-72 lg:w-96 h-48 sm:h-72 lg:h-96 bg-indigo-500/30 rounded-full blur-3xl animate-float"></div>

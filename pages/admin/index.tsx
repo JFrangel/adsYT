@@ -321,7 +321,7 @@ export default function AdminPanel() {
         <Head>
           <title>Admin Panel</title>
         </Head>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-[100dvh] flex items-center justify-center">
           <div className="relative">
             <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
             <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping"></div>
@@ -337,7 +337,7 @@ export default function AdminPanel() {
         <title>Admin Panel</title>
       </Head>
       
-      <div className="min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 relative overflow-hidden">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-20 w-48 sm:w-72 lg:w-96 h-48 sm:h-72 lg:h-96 bg-purple-500/20 rounded-full blur-3xl animate-float"></div>
