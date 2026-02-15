@@ -36,6 +36,7 @@ export default function AdminPanel() {
   const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
   const [savingCheckpoint, setSavingCheckpoint] = useState(false);
   const [refreshingClicks, setRefreshingClicks] = useState(false);
+  const [debuggingCache, setDebuggingCache] = useState(false);
   
   // Dialog hooks
   const {
@@ -103,6 +104,26 @@ export default function AdminPanel() {
       console.error('Error syncing clicks:', error);
     } finally {
       setRefreshingClicks(false);
+    }
+  };
+
+  const debugCache = async () => {
+    setDebuggingCache(true);
+    try {
+      const debugResponse = await axios.get('/api/admin/debug-clicks');
+      
+      console.log('🔍 Cache Debug Info:', debugResponse.data.debug);
+      
+      showAlert(
+        'Cache Debug Complete', 
+        'Información del cache enviada a la consola. Abre Developer Tools (F12) para ver los detalles.',
+        'info'
+      );
+    } catch (error) {
+      showAlert('Error', 'No se pudo obtener información de debug', 'error');
+      console.error('Error debugging cache:', error);
+    } finally {
+      setDebuggingCache(false);
     }
   };
 
@@ -577,6 +598,17 @@ export default function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 {refreshingClicks ? 'Actualizando...' : 'Actualizar Clicks'}
+              </button>
+              
+              <button
+                onClick={debugCache}
+                disabled={debuggingCache}
+                className="px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className={`w-5 h-5 ${debuggingCache ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {debuggingCache ? 'Analizando...' : 'Debug Cache'}
               </button>
               
               <button

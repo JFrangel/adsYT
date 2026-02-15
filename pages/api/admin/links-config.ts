@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
-import { getClicks, getLastUsedIndex } from '@/lib/click-cache';
+import { getClicks, getLastUsedIndex, clickCache } from '@/lib/click-cache';
 
 interface LinkConfig {
   id: string;
@@ -125,11 +125,23 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const config = getLinksConfig();
       
-      // Meramente los clicks del caché en memoria con la configuración del archivo
-      config.links = config.links.map(link => ({
-        ...link,
-        clicks: getClicks(link.id) || link.clicks
-      }));
+      console.log('📊 Admin panel requesting links config');
+      console.log('📝 Raw config from file:', config.links.map(l => ({ id: l.id, name: l.name, fileClicks: l.clicks })));
+      console.log('📝 Memory cache clicks:', Object.keys(clickCache).reduce((acc, key) => { acc[key] = getClicks(key); return acc; }, {} as any));
+      
+      // Usar SIEMPRE los clicks del caché en memoria (ya sincronizados)
+      config.links = config.links.map(link => {
+        const memoryClicks = getClicks(link.id);
+        const finalClicks = memoryClicks !== undefined ? memoryClicks : link.clicks;
+        console.log(`🔗 ${link.name}: file=${link.clicks}, memory=${memoryClicks}, final=${finalClicks}`);
+        
+        return {
+          ...link,
+          clicks: finalClicks
+        };
+      });
+      
+      console.log('✅ Final links with clicks:', config.links.map(l => ({ id: l.id, name: l.name, clicks: l.clicks })));
       
       return res.status(200).json(config);
     } catch (error: any) {
