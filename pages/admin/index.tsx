@@ -14,6 +14,15 @@ interface FileItem {
   visible: boolean;
 }
 
+interface LinkConfig {
+  id: string;
+  name: string;
+  url: string;
+  clicks: number;
+  enabled: boolean;
+  active: boolean;
+}
+
 export default function AdminPanel() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -21,6 +30,8 @@ export default function AdminPanel() {
   const [uploading, setUploading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [links, setLinks] = useState<LinkConfig[]>([]);
+  const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
 
   useEffect(() => {
     setMounted(true);
@@ -31,13 +42,55 @@ export default function AdminPanel() {
     try {
       const response = await axios.get('/api/admin/check');
       if (response.data.authenticated) {
-        setAuthenticated(true);
-        fetchFiles();
+        fetchLinks();
       } else {
         router.push('/admin/login');
       }
     } catch (error) {
       router.push('/admin/login');
+    }
+  };
+
+  const fetchLinks = async () => {
+    try {
+      const response = await axios.get('/api/admin/links-config');
+      setLinks(response.data.links || []);
+      setLinksMode(response.data.mode || 'single');
+    } catch (error) {
+      console.error('Error fetching links:', error
+    } catch (error) {
+      router.push('/admin/login');
+    }
+  };
+
+  const updateLinkMode = async (newMode: 'single' | 'alternate') => {
+    try {
+      const response = await axios.put('/api/admin/links-config', { mode: newMode });
+      setLinksMode(newMode);
+      setLinks(response.data.config.links);
+    } catch (error) {
+      console.error('Error updating link mode:', error);
+    }
+  };
+
+  const setActiveLink = async (linkId: string) => {
+    try {
+      const response = await axios.put('/api/admin/links-config', { activeLink: linkId });
+      setLinks(response.data.config.links);
+    } catch (error) {
+      console.error('Error setting active link:', error);
+    }
+  };
+
+  const toggleLink = async (linkId: string) => {
+    try {
+      const updatedLinks = links.map(l => 
+        l.id === linkId ? { ...l, enabled: !l.enabled } : l
+      );
+      const response = await axios.put('/api/admin/links-config', { links: updatedLinks });
+      setLinks(response.data.config.links);
+    } catch (error) {
+      console.error('Error toggling link:', error);
     }
   };
 
@@ -242,6 +295,104 @@ export default function AdminPanel() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Direct Links Section */}
+          <div className="card mt-8 animate-fade-in">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6 gradient-text flex items-center gap-2">
+              💰 Links Directos (Monetización)
+            </h2>
+
+            {/* Mode Selection */}
+            <div className="mb-6 glass-card p-4">
+              <p className="text-sm font-semibold text-purple-200 mb-3">Modo de Links:</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => updateLinkMode('single')}
+                  className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                    linksMode === 'single'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white/10 text-purple-200 hover:bg-white/20'
+                  }`}
+                >
+                  Único (Link Activo)
+                </button>
+                <button
+                  onClick={() => updateLinkMode('alternate')}
+                  className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                    linksMode === 'alternate'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white/10 text-purple-200 hover:bg-white/20'
+                  }`}
+                >
+                  Alternado (Ambos)
+                </button>
+              </div>
+              <p className="text-xs text-purple-300/70 mt-2">
+                {linksMode === 'single' 
+                  ? '📌 Solo se mostrará el link activo' 
+                  : '🔄 Se mostrarán ambos links alternándose'}
+              </p>
+            </div>
+
+            {/* Links List */}
+            <div className="space-y-3">
+              {links.map((link) => (
+                <div key={link.id} className="glass-card p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg text-white">{link.name}</h3>
+                      <p className="text-xs sm:text-sm text-purple-300/70 break-all">
+                        {link.url}
+                      </p>
+                      <div className="mt-2 flex gap-4 text-sm">
+                        <span className="text-yellow-400">📊 Clics: <strong>{link.clicks}</strong></span>
+                        <span className={link.active ? 'text-green-400' : 'text-gray-400'}>
+                          {link.active ? '✅ Activo' : '⭕ Inactivo'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+                      <button
+                        onClick={() => setActiveLink(link.id)}
+                        className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
+                          link.active
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white/10 text-green-400 hover:bg-green-600/30'
+                        }`}
+                      >
+                        {link.active ? '✓ Activo' : 'Activar'}
+                      </button>
+                      <button
+                        onClick={() => toggleLink(link.id)}
+                        className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
+                          link.enabled
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white/10 text-blue-400'
+                        }`}
+                      >
+                        {link.enabled ? '👁️ Visible' : '🚫 Oculto'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Revenue Stats */}
+            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-600/20 to-orange-600/20 rounded-lg border border-yellow-500/30">
+              <p className="text-sm font-semibold text-yellow-200 mb-3">Ingresos por 1K Vistas:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {links.filter(l => l.enabled).map(link => (
+                  <div key={link.id} className="bg-white/5 p-3 rounded">
+                    <p className="text-sm text-yellow-300">{link.name}</p>
+                    <p className="text-lg font-bold text-yellow-400">
+                      👀 {link.clicks} clics
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
