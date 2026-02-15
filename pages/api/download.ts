@@ -47,14 +47,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET request - download file from local storage
     try {
-      // Build path to archivos directory
-      const archivosDir = path.join(process.cwd(), 'archivos');
-      const filePath = path.join(archivosDir, fileItem.filename);
+      // Build path to files directory
+      const filesDir = path.join(process.cwd(), 'files');
+      const filePath = path.join(filesDir, fileItem.filename);
       
-      // Security: ensure file path is within archivos directory
+      // Security: ensure file path is within files directory
       const normalizedPath = path.normalize(filePath);
-      if (!normalizedPath.startsWith(archivosDir)) {
-        console.error('Security violation: attempted to access file outside archivos directory');
+      if (!normalizedPath.startsWith(filesDir)) {
+        console.error('Security violation: attempted to access file outside files directory');
         return res.status(403).json({ error: 'Access denied' });
       }
 
