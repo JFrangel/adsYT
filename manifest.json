@@ -1,24 +1,3 @@
 {
-  "files": [
-    {
-      "id": "ej8da5bsm39",
-      "name": "x",
-      "filename": "SCAN1244.pdf",
-      "size": 516720,
-      "sha": "c1e9b8d7ae65f8df849c5f7e5fea204dfab41e66",
-      "uploadedAt": "2026-02-15T02:58:25.755Z",
-      "downloads": 24,
-      "visible": true
-    },
-    {
-      "id": "bui0ayt5y0w",
-      "name": "x",
-      "filename": "SCAN1244 (2).pdf",
-      "size": 516720,
-      "sha": "c1e9b8d7ae65f8df849c5f7e5fea204dfab41e66",
-      "uploadedAt": "2026-02-15T03:07:39.376Z",
-      "downloads": 7,
-      "visible": true
-    }
-  ]
+  "files": []
 }
