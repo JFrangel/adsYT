@@ -55,21 +55,42 @@ export default function Entry3() {
 
   const handleDownload = async (file: FileItem) => {
     try {
-      // Track download first (no bloqueante)
-      axios.post(`/api/download?file=${file.id}`).catch(console.error);
+      // Para Android/iOS: abrir ventana del anuncio INMEDIATAMENTE (síncrono con el click)
+      const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // Open download link immediately
+      // Abrir descarga también inmediatamente
       window.open(`/api/download?file=${file.id}`, '_blank');
       
-      // Get dynamic ad link from the system (igual que en entry2/ad-visit)
-      const response = await axios.get('/api/get-redirect-link');
-      const adUrl = response.data.url;
+      // Track download (no bloqueante)
+      axios.post(`/api/download?file=${file.id}`).catch(console.error);
       
-      // Para iOS/Safari: usar window.location.href en lugar de window.open después de await
-      // Esto evita problemas con popup blockers en iOS
-      setTimeout(() => {
-        window.open(adUrl, '_blank', 'noopener,noreferrer');
-      }, 100);
+      try {
+        // Obtener URL del anuncio
+        const response = await axios.get('/api/get-redirect-link');
+        const adUrl = response.data.url;
+        
+        // Si la ventana sigue abierta, redirigir a la URL real
+        if (adWindow && !adWindow.closed) {
+          adWindow.location.href = adUrl;
+        } else {
+          // Si el popup fue bloqueado, usar fallback
+          console.warn('Popup blocked, using fallback redirect');
+          // Pequeño delay para que la descarga se inicie, luego redirigir en la misma pestaña
+          setTimeout(() => {
+            window.location.href = adUrl;
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error getting ad link:', error);
+        // Cerrar ventana vacía si hay error
+        if (adWindow && !adWindow.closed) {
+          adWindow.close();
+        }
+        // Fallback a ad-visit
+        setTimeout(() => {
+          router.push('/ad-visit');
+        }, 1000);
+      }
       
     } catch (error) {
       console.error('Error in download process:', error);
