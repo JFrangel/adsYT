@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- files/ data/"
   
 [build.environment]
   NODE_VERSION = "18"
@@ -8,14 +9,6 @@
 # Only build on main branch to avoid builds from data branch
 [context.branch-deploy]
   command = "echo 'Skipping build for non-main branch'"
-
-# Build settings for reduced unnecessary builds  
-[build.processing]
-  skip_processing = false
-
-# Ignore certain file patterns that shouldn't trigger builds
-[build.ignore]
-  command = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- files/ data/"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
