@@ -44,6 +44,8 @@ export default function Entry3() {
       setFiles(response.data.files || []);
     } catch (error) {
       console.error('Error fetching files:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
