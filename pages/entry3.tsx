@@ -55,41 +55,24 @@ export default function Entry3() {
 
   const handleDownload = async (file: FileItem) => {
     try {
-      // Para iOS/Safari: obtener la URL del ad ANTES de abrir ventanas
-      // Así window.open() está sincrónico con el evento del usuario
-      const adLinkPromise = axios.get('/api/get-redirect-link');
-      
-      // Abrir ventanas INMEDIATAMENTE (sincrónico con el click del usuario)
-      const downloadWindow = window.open(`/api/download?file=${file.id}`, '_blank');
-      const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
-      
-      // Track download (no bloqueante)
+      // Track download first (no bloqueante)
       axios.post(`/api/download?file=${file.id}`).catch(console.error);
       
-      // Esperar por la respuesta del ad link
-      try {
-        const response = await adLinkPromise;
-        const adUrl = response.data.url;
-        
-        // Redirigir la ventana de anuncio a la URL obtenida
-        if (adWindow && !adWindow.closed) {
-          adWindow.location.href = adUrl;
-        } else if (!downloadWindow || downloadWindow.closed) {
-          // Si ambas ventanas fueron bloqueadas, abrir en la misma pestaña
-          window.location.href = adUrl;
-        }
-      } catch (error) {
-        console.error('Error getting ad link:', error);
-        // Si hay error, cerrar ventana vacía y redirigir a ad-visit
-        if (adWindow && !adWindow.closed) {
-          adWindow.close();
-        }
-        if (!downloadWindow || downloadWindow.closed) {
-          router.push('/ad-visit');
-        }
-      }
+      // Open download link immediately
+      window.open(`/api/download?file=${file.id}`, '_blank');
+      
+      // Get dynamic ad link from the system (igual que en entry2/ad-visit)
+      const response = await axios.get('/api/get-redirect-link');
+      const adUrl = response.data.url;
+      
+      // Para iOS/Safari: usar window.location.href en lugar de window.open después de await
+      // Esto evita problemas con popup blockers en iOS
+      setTimeout(() => {
+        window.open(adUrl, '_blank', 'noopener,noreferrer');
+      }, 100);
+      
     } catch (error) {
-      console.error('Error downloading file:', error);
+      console.error('Error in download process:', error);
       showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
     }
   };
