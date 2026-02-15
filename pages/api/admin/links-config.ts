@@ -1,139 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
-import path from 'path';
-import { getClicks, getLastUsedIndex, clickCache } from '@/lib/click-cache';
+import { getClicks, clickCache } from '@/lib/click-cache';
+import { getLinksConfig, saveLinksConfig, LinkConfig, LinksData } from '@/lib/links-config';
 
-interface LinkConfig {
-  id: string;
-  name: string;
-  url: string;
-  clicks: number;
-  enabled: boolean;
-  active: boolean; // Si es el link activo por defecto
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface LinksData {
-  links: LinkConfig[];
-  mode: 'single' | 'alternate'; // single: usa el link activo, alternate: alterna entre ambos
-}
-
-const configFile = path.join(process.cwd(), 'config', 'links.json');
-
-// Crear directorio config si no existe
-function ensureConfigDir() {
-  const configDir = path.dirname(configFile);
-  try {
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-  } catch (error) {
-    console.warn('Could not create config directory:', error);
-  }
-}
-
-// Obtener configuración de links
-function getLinksConfig(): LinksData {
-  try {
-    ensureConfigDir();
-    
-    if (!fs.existsSync(configFile)) {
-      const defaultConfig: LinksData = {
-        mode: 'alternate',
-        links: [
-          {
-            id: 'monetag',
-            name: 'Monetag',
-            url: 'https://omg10.com/4/9722913',
-            clicks: getClicks('monetag'),
-            enabled: true,
-            active: true,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-          {
-            id: 'adsterra',
-            name: 'AdSterra',
-            url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-            clicks: getClicks('adsterra'),
-            enabled: true,
-            active: false,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }
-        ]
-      };
-      
-      try {
-        fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
-      } catch (writeError) {
-        console.warn('Could not write default config (read-only filesystem):', writeError);
-      }
-      
-      return defaultConfig;
-    }
-    
-    const data = fs.readFileSync(configFile, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading config, using defaults:', error);
-    // Retornar configuración por defecto si hay cualquier error
-    return {
-      mode: 'alternate',
-      links: [
-        {
-          id: 'monetag',
-          name: 'Monetag',
-          url: 'https://omg10.com/4/9722913',
-          clicks: getClicks('monetag'),
-          enabled: true,
-          active: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: 'adsterra',
-          name: 'AdSterra',
-          url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-          clicks: getClicks('adsterra'),
-          enabled: true,
-          active: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        }
-      ]
-    };
-  }
-}
-
-// Guardar configuración de links
-function saveLinksConfig(config: LinksData): boolean {
-  try {
-    ensureConfigDir();
-    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-    return true;
-  } catch (error) {
-    console.warn('Could not save config (read-only filesystem):', error);
-    return false;
-  }
-}
-
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     // Obtener configuración de links
     try {
-      const config = getLinksConfig();
+      const config = await getLinksConfig();
       
       console.log('📊 Admin panel requesting links config');
-      console.log('📝 Raw config from file:', config.links.map(l => ({ id: l.id, name: l.name, fileClicks: l.clicks })));
+      console.log('📝 Config loaded with mode:', config.mode);
+      console.log('📝 Raw config from storage:', config.links.map(l => ({ id: l.id, name: l.name, fileClicks: l.clicks })));
       console.log('📝 Memory cache clicks:', Object.keys(clickCache).reduce((acc, key) => { acc[key] = getClicks(key); return acc; }, {} as any));
       
       // Usar SIEMPRE los clicks del caché en memoria (ya sincronizados)
       config.links = config.links.map(link => {
         const memoryClicks = getClicks(link.id);
         const finalClicks = memoryClicks !== undefined ? memoryClicks : link.clicks;
-        console.log(`🔗 ${link.name}: file=${link.clicks}, memory=${memoryClicks}, final=${finalClicks}`);
+        console.log(`🔗 ${link.name}: stored=${link.clicks}, memory=${memoryClicks}, final=${finalClicks}`);
         
         return {
           ...link,
@@ -141,10 +25,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         };
       });
       
-      console.log('✅ Final links with clicks:', config.links.map(l => ({ id: l.id, name: l.name, clicks: l.clicks })));
+      console.log('✅ Final config returned:', { 
+        mode: config.mode, 
+        links: config.links.map(l => ({ id: l.id, name: l.name, clicks: l.clicks }))
+      });
       
       return res.status(200).json(config);
     } catch (error: any) {
+      console.error('❌ Error reading links config:', error);
       return res.status(500).json({ error: 'Error reading links config' });
     }
   }
@@ -158,7 +46,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     }
     
     try {
-      const config = getLinksConfig();
+      const config = await getLinksConfig();
       const link = config.links.find(l => l.id === linkId);
       
       if (!link) {
@@ -168,9 +56,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       link.clicks += 1;
       link.updatedAt = Date.now();
       
-      const saved = saveLinksConfig(config);
+      const saved = await saveLinksConfig(config);
       if (!saved) {
-        console.warn('Click count updated but not persisted (read-only filesystem)');
+        console.warn('Click count updated but not persisted');
       }
       
       return res.status(200).json({
@@ -189,11 +77,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     const { mode, activeLink, links, addLink, editLink, deleteLink } = req.body;
     
     try {
-      const config = getLinksConfig();
+      const config = await getLinksConfig();
+      console.log('🔄 Updating links config from:', { currentMode: config.mode, newMode: mode });
       
       // Cambiar modo
       if (mode) {
         config.mode = mode;
+        console.log('✅ Mode updated to:', mode);
       }
       
       // Cambiar link activo
@@ -201,6 +91,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         config.links.forEach(l => {
           l.active = l.id === activeLink;
         });
+        console.log('✅ Active link set to:', activeLink);
       }
       
       // Agregar nuevo link
@@ -216,6 +107,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           updatedAt: Date.now(),
         };
         config.links.push(newLink);
+        console.log('✅ New link added:', newLink.name);
       }
       
       // Editar link existente
@@ -228,6 +120,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             url: editLink.url ?? config.links[linkIndex].url,
             updatedAt: Date.now(),
           };
+          console.log('✅ Link edited:', editLink.name || config.links[linkIndex].name);
         }
       }
       
@@ -238,6 +131,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         if (config.links.length > 0 && !config.links.some(l => l.active)) {
           config.links[0].active = true;
         }
+        console.log('✅ Link deleted:', deleteLink);
       }
       
       // Actualización masiva de links
@@ -250,12 +144,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             updatedAt: Date.now(),
           };
         });
+        console.log('✅ Mass update of links completed');
       }
       
-      const saved = saveLinksConfig(config);
+      const saved = await saveLinksConfig(config);
       if (!saved) {
-        console.warn('Config updated but not persisted (read-only filesystem)');
+        console.warn('⚠️ Config updated but not persisted to any storage');
       }
+      
+      console.log('✅ Links config update completed:', { 
+        mode: config.mode, 
+        saved,
+        message: saved ? 'Saved to GitHub data branch' : 'Could not persist changes'
+      });
       
       return res.status(200).json({
         success: true,
@@ -263,7 +164,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         persisted: saved,
       });
     } catch (error: any) {
-      console.error('Error updating links config:', error);
+      console.error('❌ Error updating links config:', error);
       return res.status(500).json({ error: 'Error updating links config' });
     }
   }

@@ -1,137 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
-import path from 'path';
 import { getClicks, incrementClicks, getLastUsedIndex, setLastUsedIndex, initializeFromCheckpoint, clickCache } from '@/lib/click-cache';
-
-interface LinkConfig {
-  id: string;
-  name: string;
-  url: string;
-  clicks: number;
-  enabled: boolean;
-  active: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface LinksData {
-  links: LinkConfig[];
-  mode: 'single' | 'alternate';
-  lastUsedIndex?: number;
-}
-
-const configFile = path.join(process.cwd(), 'config', 'links.json');
-
-function ensureConfigDir() {
-  const configDir = path.dirname(configFile);
-  try {
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-  } catch (error) {
-    console.warn('Could not create config directory:', error);
-  }
-}
-
-function getLinksConfig(): LinksData {
-  try {
-    if (!fs.existsSync(configFile)) {
-      // Configuración por defecto si no existe el archivo
-      const defaultConfig: LinksData = {
-        mode: 'alternate',
-        links: [
-          {
-            id: 'monetag',
-            name: 'Monetag',
-            url: 'https://omg10.com/4/9722913',
-            clicks: 0,
-            enabled: true,
-            active: true,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-          {
-            id: 'adsterra',
-            name: 'AdSterra',
-            url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-            clicks: 0,
-            enabled: true,
-            active: false,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }
-        ]
-      };
-      
-      // Intentar crear el archivo, pero no fallar si no se puede
-      try {
-        ensureConfigDir();
-        fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
-      } catch (writeError) {
-        console.warn('Could not write default config file (read-only filesystem?):', writeError);
-      }
-      
-      return defaultConfig;
-    }
-    
-    const data = fs.readFileSync(configFile, 'utf-8');
-    const config = JSON.parse(data);
-    
-    // Apply in-memory click counts
-    config.links = config.links.map((link: LinkConfig) => ({
-      ...link,
-      clicks: getClicks(link.id) || link.clicks
-    }));
-    
-    // Apply last used index from cache
-    const cachedIndex = getLastUsedIndex();
-    if (cachedIndex !== undefined) {
-      config.lastUsedIndex = cachedIndex;
-    }
-    
-    return config;
-  } catch (error) {
-    console.error('Error reading config file:', error);
-    // Retornar configuración por defecto si hay error
-    return {
-      mode: 'alternate',
-      links: [
-        {
-          id: 'monetag',
-          name: 'Monetag',
-          url: 'https://omg10.com/4/9722913',
-          clicks: getClicks('monetag'),
-          enabled: true,
-          active: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: 'adsterra',
-          name: 'AdSterra',
-          url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
-          clicks: getClicks('adsterra'),
-          enabled: true,
-          active: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        }
-      ],
-      lastUsedIndex: getLastUsedIndex()
-    };
-  }
-}
-
-function saveLinksConfig(config: LinksData) {
-  try {
-    ensureConfigDir();
-    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-    return true;
-  } catch (error) {
-    console.warn('Could not save config (read-only filesystem?):', error);
-    return false;
-  }
-}
+import { getLinksConfig, LinksData, LinkConfig } from '@/lib/links-config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -142,76 +11,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await initializeFromCheckpoint();
 
   try {
-    const config = getLinksConfig();
-    const enabledLinks = config.links.filter(l => l.enabled);
-
-    if (enabledLinks.length === 0) {
-      return res.status(404).json({ error: 'No enabled links found' });
-    }
-
-    let selectedLink: LinkConfig;
-
-    if (config.mode === 'single') {
-      // Modo single: usa el link marcado como activo
-      const activeLink = enabledLinks.find(l => l.active);
-      selectedLink = activeLink || enabledLinks[0];
-    } else {
-      // Modo alternate: alterna entre los links habilitados
-      const lastIndex = getLastUsedIndex() ?? -1;
-      const nextIndex = (lastIndex + 1) % enabledLinks.length;
-      selectedLink = enabledLinks[nextIndex];
-      
-      // Guardar el índice del link usado en memoria
-      setLastUsedIndex(nextIndex);
-    }
-
-    // Incrementar contador de clics en memoria
-    const currentClicks = await incrementClicks(selectedLink.id);
+    // Obtener configuración de links (ahora desde GitHub + fallback local)
+    const config = await getLinksConfig();
     
-    console.log(`🎯 Click tracked for ${selectedLink.name} (${selectedLink.id}): ${currentClicks} total clicks`);
-    console.log(`📊 Current cache state:`, {
-      monetag: getClicks('monetag'),
-      adsterra: getClicks('adsterra'),
-      allLinks: Object.keys(clickCache).reduce((acc, key) => {
-        acc[key] = getClicks(key);
-        return acc;
-      }, {} as any)
-    });
-
-    // Intentar guardar cambios en archivo (puede fallar en readonly filesystem)
-    try {
-      const linkInConfig = config.links.find(l => l.id === selectedLink.id);
-      if (linkInConfig) {
-        linkInConfig.clicks = getClicks(selectedLink.id);
-        linkInConfig.updatedAt = Date.now();
+    console.log('🎯 Getting redirect link');
+    console.log('📋 Current config mode:', config.mode);
+    console.log('📊 Cache state before link selection:', { ...clickCache });
+    
+    let selectedLink: LinkConfig | null = null;
+    
+    if (config.mode === 'single') {
+      // Modo único: usar el link marcado como activo
+      selectedLink = config.links.find(link => link.active && link.enabled) || null;
+      
+      if (!selectedLink) {
+        // Si no hay link activo, usar el primero habilitado
+        selectedLink = config.links.find(link => link.enabled) || null;
       }
-      saveLinksConfig(config);
-    } catch (saveError) {
-      console.warn('Could not save to file, using in-memory cache only');
+      
+      console.log('🎯 Single mode - selected link:', selectedLink?.name);
+      
+    } else {
+      // Modo alternancia: alternar entre links habilitados
+      const enabledLinks = config.links.filter(link => link.enabled);
+      
+      if (enabledLinks.length === 0) {
+        return res.status(500).json({ error: 'No links available' });
+      }
+      
+      if (enabledLinks.length === 1) {
+        selectedLink = enabledLinks[0];
+        console.log('🎯 Alternate mode - only one link available:', selectedLink.name);
+      } else {
+        // Obtener índice del último link usado
+        let lastIndex = getLastUsedIndex() ?? -1;
+        
+        // Seleccionar el siguiente link en la lista
+        const nextIndex = (lastIndex + 1) % enabledLinks.length;
+        selectedLink = enabledLinks[nextIndex];
+        
+        // Guardar el índice para la próxima vez
+        setLastUsedIndex(nextIndex);
+        
+        console.log('🎯 Alternate mode - rotation:', {
+          lastIndex,
+          nextIndex,
+          selectedLink: selectedLink.name,
+          totalEnabled: enabledLinks.length
+        });
+      }
     }
+    
+    if (!selectedLink) {
+      console.error('❌ No valid link found');
+      return res.status(500).json({ error: 'No valid links found' });
+    }
+
+    // Incrementar contador de clicks (esto guardará en GitHub cada 1000 clicks)
+    await incrementClicks(selectedLink.id);
+    
+    console.log('✅ Link selected and click tracked:', {
+      linkId: selectedLink.id,
+      linkName: selectedLink.name,
+      newClickCount: getClicks(selectedLink.id),
+      url: selectedLink.url
+    });
+    
+    console.log('📊 Cache state after click increment:', { ...clickCache });
 
     return res.status(200).json({
       url: selectedLink.url,
       linkId: selectedLink.id,
       linkName: selectedLink.name,
+      clicks: getClicks(selectedLink.id),
+      mode: config.mode,
+      message: `Redirecting to ${selectedLink.name}`
     });
-  } catch (error: any) {
-    console.error('Error getting redirect link:', error);
     
-    // Intentar devolver un link por defecto incluso si hay error
-    try {
-      const fallbackUrl = 'https://omg10.com/4/9722913';
-      console.log('Using fallback URL:', fallbackUrl);
-      return res.status(200).json({
-        url: fallbackUrl,
-        linkId: 'monetag',
-        linkName: 'Monetag (Fallback)',
-      });
-    } catch (fallbackError) {
-      return res.status(500).json({ 
-        error: 'Error getting redirect link',
-        details: error.message 
-      });
-    }
+  } catch (error: any) {
+    console.error('❌ Error in get-redirect-link:', error);
+    return res.status(500).json({ 
+      error: 'Error getting redirect link',
+      details: error.message
+    });
   }
 }
