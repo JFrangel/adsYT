@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { decrypt } from './encryption';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -87,8 +88,24 @@ export class GitHubService {
 }
 
 export function createGitHubService(): GitHubService {
+  let token = process.env.GITHUB_TOKEN || '';
+  
+  // If token is encrypted, decrypt it
+  if (process.env.GITHUB_TOKEN_ENCRYPTED) {
+    try {
+      token = decrypt(process.env.GITHUB_TOKEN_ENCRYPTED);
+    } catch (error) {
+      console.error('Failed to decrypt GitHub token:', error);
+      throw new Error('Invalid GITHUB_TOKEN_ENCRYPTED. Make sure ENCRYPTION_KEY is set correctly.');
+    }
+  }
+  
+  if (!token) {
+    throw new Error('GitHub token not found. Set GITHUB_TOKEN or GITHUB_TOKEN_ENCRYPTED in .env');
+  }
+  
   return new GitHubService({
-    token: process.env.GITHUB_TOKEN || '',
+    token,
     owner: process.env.GITHUB_OWNER || '',
     repo: process.env.GITHUB_REPO || '',
     branch: process.env.GITHUB_BRANCH || 'main',
