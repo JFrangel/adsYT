@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createGitHubService } from '@/lib/github';
+import { createGitHubService, createGitHubDataService } from '@/lib/github';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -7,22 +7,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const github = createGitHubService();
+    const github = createGitHubService(); // Para leer manifest desde main
+    const githubData = createGitHubDataService(); // Para leer stats desde data
     
-    // Fetch manifest.json from GitHub
+    // Fetch manifest.json from GitHub main branch
     const manifestFile = await github.getFile('manifest.json');
     
     if (!manifestFile) {
       return res.status(200).json({ files: [] });
     }
 
-    // Decode content
-    const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
-    const manifest = JSON.parse(content);
+    // Decode manifest content
+    const manifestContent = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
+    const manifest = JSON.parse(manifestContent);
+
+    // Fetch download stats from data branch
+    let downloadStats: any = {};
+    try {
+      const downloadsFile = await githubData.getFile('downloads-stats.json');
+      if (downloadsFile) {
+        const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
+        downloadStats = JSON.parse(statsContent);
+      }
+    } catch (statsError) {
+      console.log('ℹ️ No download stats found in data branch (first run or not created yet)');
+    }
+
+    // Combine manifest data with download stats
+    const filesWithStats = manifest.files?.map((file: any) => ({
+      ...file,
+      downloads: downloadStats[file.id] || file.downloads || 0 // Use data branch stats, fallback to manifest, then 0
+    })) || [];
 
     // Filter visible files only
-    const visibleFiles = manifest.files?.filter((f: any) => f.visible !== false) || [];
+    const visibleFiles = filesWithStats.filter((f: any) => f.visible !== false);
 
+    console.log('✅ Files served with combined stats from main + data branches');
     return res.status(200).json({ files: visibleFiles });
   } catch (error: any) {
     console.error('Error fetching files:', error);

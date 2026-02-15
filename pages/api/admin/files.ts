@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAdmin } from '@/lib/auth';
-import { createGitHubService } from '@/lib/github';
+import { createGitHubService, createGitHubDataService } from '@/lib/github';
 import formidable from 'formidable';
 import fs from 'fs';
 
@@ -28,21 +28,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: error.message });
   }
 
-  const github = createGitHubService();
+  const github = createGitHubService(); // Para leer/escribir en main
+  const githubData = createGitHubDataService(); // Para leer stats desde data
 
   // GET - List files
   if (req.method === 'GET') {
     try {
+      // Get manifest from main branch
       const manifestFile = await github.getFile('manifest.json');
       
       if (!manifestFile) {
         return res.status(200).json({ files: [] });
       }
 
-      const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
-      const manifest = JSON.parse(content);
+      const manifestContent = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
+      const manifest = JSON.parse(manifestContent);
 
-      return res.status(200).json({ files: manifest.files || [] });
+      // Get download stats from data branch
+      let downloadStats: any = {};
+      try {
+        const downloadsFile = await githubData.getFile('downloads-stats.json');
+        if (downloadsFile) {
+          const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
+          downloadStats = JSON.parse(statsContent);
+        }
+      } catch (statsError) {
+        console.log('ℹ️ No download stats found in data branch for admin panel');
+      }
+
+      // Combine manifest data with download stats for admin view
+      const filesWithStats = manifest.files?.map((file: any) => ({
+        ...file,
+        downloads: downloadStats[file.id] || file.downloads || 0
+      })) || [];
+
+      return res.status(200).json({ files: filesWithStats });
     } catch (error: any) {
       console.error('Error fetching files:', error);
       
@@ -98,13 +118,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         size: file.size,
         sha: result.content.sha,
         uploadedAt: new Date().toISOString(),
-        downloads: 0,
         visible: true,
+        // downloads removed - now tracked in data branch
       };
 
       manifest.files = manifest.files || [];
       manifest.files.push(newFile);
 
+      // Update manifest in main branch (file info only)
       await github.createOrUpdateFile(
         'manifest.json',
         JSON.stringify(manifest, null, 2),
@@ -112,7 +133,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         manifestFile?.sha
       );
 
-      return res.status(200).json({ success: true, file: newFile });
+      // Initialize download stats in data branch to avoid Netlify builds
+      try {
+        console.log('📊 Initializing download stats in data branch...');
+        
+        let downloadStats: any = {};
+        const downloadsFile = await githubData.getFile('downloads-stats.json');
+        if (downloadsFile) {
+          const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
+          downloadStats = JSON.parse(statsContent);
+        }
+        
+        // Initialize download count for new file
+        downloadStats[newFile.id] = 0;
+        
+        await githubData.createOrUpdateFile(
+          'downloads-stats.json',
+          JSON.stringify(downloadStats, null, 2),
+          `Initialize download stats for ${filename} [skip ci]`,
+          downloadsFile?.sha
+        );
+        
+        console.log('✅ Download stats initialized in data branch');
+      } catch (statsError) {
+        console.warn('⚠️ Could not initialize download stats in data branch:', statsError);
+        // Not critical - stats will be created on first download
+      }
+
+      return res.status(200).json({ 
+        success: true, 
+        file: { ...newFile, downloads: 0 } // Add downloads for response
+      });
     } catch (error: any) {
       console.error('Upload error:', error);
       return res.status(500).json({ error: 'Upload failed: ' + error.message });

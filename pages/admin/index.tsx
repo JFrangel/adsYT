@@ -36,6 +36,7 @@ export default function AdminPanel() {
   const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
   const [savingCheckpoint, setSavingCheckpoint] = useState(false);
   const [refreshingClicks, setRefreshingClicks] = useState(false);
+  const [refreshingDownloads, setRefreshingDownloads] = useState(false);
   const [debuggingCache, setDebuggingCache] = useState(false);
   
   // Dialog hooks
@@ -104,6 +105,30 @@ export default function AdminPanel() {
       console.error('Error syncing clicks:', error);
     } finally {
       setRefreshingClicks(false);
+    }
+  };
+
+  const refreshDownloads = async () => {
+    setRefreshingDownloads(true);
+    try {
+      // Sincronizar estadísticas de descargas desde rama data
+      const syncResponse = await axios.post('/api/admin/sync-downloads');
+      
+      // Actualizar la vista de archivos
+      await fetchFiles();
+      
+      showAlert(
+        'Descargas Sincronizadas', 
+        'Las estadísticas de descarga se sincronizaron desde la rama data correctamente',
+        'success'
+      );
+      
+      console.log('✅ Downloads synced:', syncResponse.data.downloads);
+    } catch (error) {
+      showAlert('Error', 'No se pudieron sincronizar las estadísticas de descarga', 'error');
+      console.error('Error syncing downloads:', error);
+    } finally {
+      setRefreshingDownloads(false);
     }
   };
 
@@ -598,6 +623,17 @@ export default function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 {refreshingClicks ? 'Actualizando...' : 'Actualizar Clicks'}
+              </button>
+
+              <button
+                onClick={refreshDownloads}
+                disabled={refreshingDownloads}
+                className="px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className={`w-5 h-5 ${refreshingDownloads ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                {refreshingDownloads ? 'Sincronizando...' : 'Actualizar Descargas'}
               </button>
               
               <button

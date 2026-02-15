@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createGitHubService } from '@/lib/github';
+import { createGitHubService, createGitHubDataService } from '@/lib/github';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,9 +11,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const github = createGitHubService();
+    const github = createGitHubService(); // Para leer archivos desde main
+    const githubData = createGitHubDataService(); // Para guardar stats en rama data
     
-    // Get manifest to find file details
+    // Get manifest from main branch to find file details
     const manifestFile = await github.getFile('manifest.json');
     
     if (!manifestFile) {
@@ -31,18 +32,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Increment download count if POST request
     if (req.method === 'POST') {
-      fileItem.downloads = (fileItem.downloads || 0) + 1;
+      console.log('💾 Updating download stats in data branch to avoid Netlify builds...');
       
-      // Update manifest
-      const updatedManifest = JSON.stringify(manifest, null, 2);
-      await github.createOrUpdateFile(
-        'manifest.json',
-        updatedManifest,
-        `Update download count for ${fileItem.name}`,
-        manifestFile.sha
-      );
+      try {
+        // Get download stats from data branch
+        let downloadStats: any = {};
+        let downloadStatsSha: string | undefined;
+        
+        const downloadsFile = await githubData.getFile('downloads-stats.json');
+        if (downloadsFile) {
+          const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
+          downloadStats = JSON.parse(statsContent);
+          downloadStatsSha = downloadsFile.sha;
+        }
+        
+        // Update download count
+        downloadStats[file] = (downloadStats[file] || 0) + 1;
+        
+        // Save to data branch
+        const updatedStats = JSON.stringify(downloadStats, null, 2);
+        await githubData.createOrUpdateFile(
+          'downloads-stats.json',
+          updatedStats,
+          `Update download count for ${fileItem.name} [skip ci]`,
+          downloadStatsSha
+        );
+        
+        console.log(`✅ Download count updated: ${fileItem.name} now has ${downloadStats[file]} downloads`);
+        return res.status(200).json({ 
+          success: true, 
+          downloads: downloadStats[file],
+          message: 'Saved to data branch - no build triggered' 
+        });
+        
+      } catch (dataError: any) {
+        console.error('❌ Error updating download stats in data branch:', dataError);
+        
+        // Fallback: try to use main branch (this will trigger build)
+        console.log('⚠️ Fallback: updating manifest in main branch (will trigger build)');
+        
+        fileItem.downloads = (fileItem.downloads || 0) + 1;
+        const updatedManifest = JSON.stringify(manifest, null, 2);
+        
+        await github.createOrUpdateFile(
+          'manifest.json',
+          updatedManifest,
+          `Update download count for ${fileItem.name}`,
+          manifestFile.sha
+        );
 
-      return res.status(200).json({ success: true });
+        return res.status(200).json({ 
+          success: true, 
+          downloads: fileItem.downloads,
+          message: 'Fallback: saved to main branch' 
+        });
+      }
     }
 
     // GET request - download file from local storage
