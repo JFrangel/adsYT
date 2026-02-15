@@ -57,9 +57,7 @@ export default function AdminPanel() {
       setLinks(response.data.links || []);
       setLinksMode(response.data.mode || 'single');
     } catch (error) {
-      console.error('Error fetching links:', error
-    } catch (error) {
-      router.push('/admin/login');
+      console.error('Error fetching links:', error);
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LinkIcon, ArrowIcon } from '@/components/Icons';
+import { ArrowIcon } from '@/components/Icons';
 
 interface LinkOption {
   id: string;

@@ -73,9 +73,19 @@ export default function Home() {
               <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
               <div>
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
-                <p className="text-sm sm:text-base opacity-90">Espacio para anuncio (configurable por admin)</p>
-                <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-purple-300/70">
-                  [Este espacio mostrará un anuncio real]
+                <div className="mt-4 sm:mt-6">
+                  <script dangerouslySetInnerHTML={{
+                    __html: `
+                      atOptions = {
+                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
+                        'format' : 'iframe',
+                        'height' : 250,
+                        'width' : 300,
+                        'params' : {}
+                      };
+                    `
+                  }} />
+                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
                 </div>
               </div>
             </div>

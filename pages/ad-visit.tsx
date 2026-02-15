@@ -196,14 +196,18 @@ export default function AdVisit() {
                 
                 {/* Ad container - responsive */}
                 <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-4 border border-gray-700/50 min-h-[250px] sm:min-h-[300px] flex items-center justify-center">
-                  {/* Placeholder for actual ad */}
-                  <div className="text-center">
-                    <div className="text-3xl mb-3">📰</div>
-                    <p className="text-gray-400 text-sm">Espacio publicitario</p>
-                    <p className="text-gray-500 text-xs mt-2">
-                      (Google AdSense, banner o anuncio personalizado)
-                    </p>
-                  </div>
+                  <script dangerouslySetInnerHTML={{
+                    __html: `
+                      atOptions = {
+                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
+                        'format' : 'iframe',
+                        'height' : 250,
+                        'width' : 300,
+                        'params' : {}
+                      };
+                    `
+                  }} />
+                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
                 </div>
               </div>
 

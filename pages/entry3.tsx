@@ -16,8 +16,7 @@ interface FileItem {
 interface LinkOption {
   id: string;
   name: string;
-  url: strinks, setLinks] = useState<LinkOption[]>([]);
-  const [ling;
+  url: string;
   clicks?: number;
   enabled?: boolean;
 }
@@ -25,6 +24,7 @@ interface LinkOption {
 export default function Entry3() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [links, setLinks] = useState<LinkOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -43,16 +43,16 @@ export default function Entry3() {
     // Only clean up AFTER validation passed
     // This way user can actually enter Paso 3
     sessionStorage.removeItem('entry2_completed');
- and links
     fetchFiles();
-    fetchLinkavailable files
-    fetchFiles();
+    fetchLinks();
   }, [router]);
 
   const fetchFiles = async () => {
     try {
       const response = await axios.get('/api/files');
       setFiles(response.data.files || []);
+    } catch (error) {
+      console.error('Error fetching files:', error);
     }
   };
 
@@ -63,14 +63,10 @@ export default function Entry3() {
       setLinks(enabledLinks);
     } catch (error) {
       console.error('Error fetching links:', error);
-    } catch (error) {
-      console.error('Error fetching files:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  co
 
   const handleLinkClick = async (link: LinkOption) => {
     try {
@@ -82,7 +78,9 @@ export default function Entry3() {
     
     // Open link in new window
     window.open(link.url, '_blank');
-  };nst handleDownload = async (file: FileItem) => {
+  };
+
+  const handleDownload = async (file: FileItem) => {
     try {
       // Track download
       await axios.post(`/api/download?file=${file.id}`);
@@ -149,7 +147,12 @@ export default function Entry3() {
               <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
               <div>
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
-                <p className="text-sm sm:text-base opacity-90">Espacio para anuncio final</p>
+                <div className="mt-4 sm:mt-6">
+                  <script dangerouslySetInnerHTML={{
+                    __html: `<script async="async" data-cfasync="false" src="https://pl28720684.effectivegatecpm.com/0dae18a90e9b6c10cbe9412694b8c64c/invoke.js"></script>`
+                  }} />
+                  <div id="container-0dae18a90e9b6c10cbe9412694b8c64c"></div>
+                </div>
               </div>
             </div>
           </div>
