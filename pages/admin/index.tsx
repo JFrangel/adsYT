@@ -85,11 +85,22 @@ export default function AdminPanel() {
   const refreshClicks = async () => {
     setRefreshingClicks(true);
     try {
+      // Primero sincronizar con GitHub
+      const syncResponse = await axios.post('/api/admin/sync-clicks');
+      
+      // Luego actualizar la vista
       await fetchLinks();
-      showAlert('Clicks Actualizados', 'Los conteos de clicks se han actualizado correctamente', 'success');
+      
+      showAlert(
+        'Clicks Sincronizados', 
+        'Los conteos de clicks se sincronizaron con GitHub y se actualizaron correctamente',
+        'success'
+      );
+      
+      console.log('✅ Clicks synced:', syncResponse.data.clicks);
     } catch (error) {
-      showAlert('Error', 'No se pudieron actualizar los clicks', 'error');
-      console.error('Error refreshing clicks:', error);
+      showAlert('Error', 'No se pudieron sincronizar los clicks con GitHub', 'error');
+      console.error('Error syncing clicks:', error);
     } finally {
       setRefreshingClicks(false);
     }
@@ -225,9 +236,19 @@ export default function AdminPanel() {
         setSavingCheckpoint(true);
         try {
           const response = await axios.post('/api/admin/save-checkpoint');
+          
+          // Formatear los clicks de todos los links
+          const clicksText = Object.entries(response.data.clicks)
+            .map(([linkId, clicks]) => {
+              const link = links.find(l => l.id === linkId);
+              const linkName = link ? link.name : linkId;
+              return `${linkName}: ${clicks} clicks`;
+            })
+            .join('\n');
+          
           showAlert(
             'Checkpoint Guardado',
-            `Monetag: ${response.data.clicks.monetag} clicks\nAdSterra: ${response.data.clicks.adsterra} clicks`,
+            clicksText || 'Checkpoint guardado exitosamente',
             'success'
           );
           await fetchLinks();

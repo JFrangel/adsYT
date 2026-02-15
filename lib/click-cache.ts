@@ -63,6 +63,50 @@ export function getClicks(linkId: string): number {
   return clickCache[linkId] || 0;
 }
 
+// Sincronizar cache en memoria con checkpoints de GitHub
+export async function syncWithGitHub(): Promise<{ [linkId: string]: number }> {
+  try {
+    console.log('🔄 Syncing clicks with GitHub checkpoint...');
+    const checkpoint = await loadCheckpointFromGitHub();
+    
+    if (checkpoint) {
+      // Para cada link en el checkpoint, usar el valor mayor entre GitHub y memoria
+      Object.keys(checkpoint).forEach(key => {
+        if (key !== 'lastUpdated' && key !== 'totalCheckpoints') {
+          const githubValue = checkpoint[key];
+          const memoryValue = clickCache[key] || 0;
+          
+          // Usar el mayor valor para no perder clicks recientes
+          clickCache[key] = Math.max(githubValue, memoryValue);
+          
+          if (githubValue > memoryValue) {
+            console.log(`📥 ${key}: Updated from ${memoryValue} to ${githubValue} (from GitHub)`);
+          } else if (memoryValue > githubValue) {
+            console.log(`📤 ${key}: Keeping ${memoryValue} (memory has more clicks than GitHub)`);
+          }
+        }
+      });
+      
+      // También agregar cualquier link que esté en memoria pero no en GitHub
+      Object.keys(clickCache).forEach(key => {
+        if (!checkpoint[key]) {
+          console.log(`✨ ${key}: ${clickCache[key]} clicks (new link, not in GitHub yet)`);
+        }
+      });
+      
+      console.log('✅ Sync completed. Current clicks:', clickCache);
+      return { ...clickCache };
+    } else {
+      console.log('ℹ️ No checkpoint found in GitHub, using memory cache');
+      return { ...clickCache };
+    }
+  } catch (error) {
+    console.error('❌ Error syncing with GitHub:', error);
+    // En caso de error, retornar cache actual
+    return { ...clickCache };
+  }
+}
+
 export async function saveCheckpoint() {
   try {
     totalCheckpoints++;

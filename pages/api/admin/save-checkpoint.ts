@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { saveCheckpoint, getClicks } from '@/lib/click-cache';
+import { saveCheckpoint, syncWithGitHub } from '@/lib/click-cache';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -10,13 +10,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('🔄 Manual checkpoint requested...');
     await saveCheckpoint();
     
+    // Sincronizar después de guardar para asegurar que tenemos los valores correctos
+    const clicks = await syncWithGitHub();
+    
     return res.status(200).json({ 
       success: true, 
       message: 'Checkpoint saved successfully',
-      clicks: {
-        monetag: getClicks('monetag'),
-        adsterra: getClicks('adsterra'),
-      }
+      clicks
     });
   } catch (error: any) {
     console.error('Error saving checkpoint:', error);
