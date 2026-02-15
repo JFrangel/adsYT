@@ -52,7 +52,7 @@ export default function Entry3() {
   const handleDownload = async (file: FileItem) => {
     try {
       // Track download
-      await axios.post('/api/download', { fileId: file.id });
+      await axios.post(`/api/download?file=${file.id}`);
       
       // Open download link
       window.open(`/api/download?file=${file.id}`, '_blank');
