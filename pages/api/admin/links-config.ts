@@ -116,21 +116,61 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   
   if (req.method === 'PUT') {
     // Actualizar configuración de links
-    const { mode, activeLink, links } = req.body;
+    const { mode, activeLink, links, addLink, editLink, deleteLink } = req.body;
     
     try {
       const config = getLinksConfig();
       
+      // Cambiar modo
       if (mode) {
         config.mode = mode;
       }
       
+      // Cambiar link activo
       if (activeLink) {
         config.links.forEach(l => {
           l.active = l.id === activeLink;
         });
       }
       
+      // Agregar nuevo link
+      if (addLink) {
+        const newLink: LinkConfig = {
+          id: addLink.id || `link_${Date.now()}`,
+          name: addLink.name,
+          url: addLink.url,
+          clicks: 0,
+          enabled: true,
+          active: config.links.length === 0, // Activo si es el primero
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        config.links.push(newLink);
+      }
+      
+      // Editar link existente
+      if (editLink) {
+        const linkIndex = config.links.findIndex(l => l.id === editLink.id);
+        if (linkIndex !== -1) {
+          config.links[linkIndex] = {
+            ...config.links[linkIndex],
+            name: editLink.name ?? config.links[linkIndex].name,
+            url: editLink.url ?? config.links[linkIndex].url,
+            updatedAt: Date.now(),
+          };
+        }
+      }
+      
+      // Eliminar link
+      if (deleteLink) {
+        config.links = config.links.filter(l => l.id !== deleteLink);
+        // Si se eliminó el link activo, activar el primero
+        if (config.links.length > 0 && !config.links.some(l => l.active)) {
+          config.links[0].active = true;
+        }
+      }
+      
+      // Actualización masiva de links
       if (links && Array.isArray(links)) {
         config.links = links.map(updatedLink => {
           const existingLink = config.links.find(l => l.id === updatedLink.id);

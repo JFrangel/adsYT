@@ -42,7 +42,9 @@ export default function AdminPanel() {
     try {
       const response = await axios.get('/api/admin/check');
       if (response.data.authenticated) {
+        setAuthenticated(true);
         fetchLinks();
+        fetchFiles();
       } else {
         router.push('/admin/login');
       }
@@ -89,6 +91,59 @@ export default function AdminPanel() {
       setLinks(response.data.config.links);
     } catch (error) {
       console.error('Error toggling link:', error);
+    }
+  };
+
+  const addNewLink = async () => {
+    const name = prompt('Nombre del link (ej: Monetag, AdSterra):');
+    if (!name) return;
+    
+    const url = prompt('URL del link:');
+    if (!url) return;
+    
+    try {
+      const response = await axios.put('/api/admin/links-config', { 
+        addLink: { name, url } 
+      });
+      setLinks(response.data.config.links);
+      alert('Link agregado correctamente');
+    } catch (error) {
+      console.error('Error adding link:', error);
+      alert('Error al agregar link');
+    }
+  };
+
+  const editLink = async (linkId: string, currentName: string, currentUrl: string) => {
+    const name = prompt('Nuevo nombre:', currentName);
+    if (!name) return;
+    
+    const url = prompt('Nuevo URL:', currentUrl);
+    if (!url) return;
+    
+    try {
+      const response = await axios.put('/api/admin/links-config', { 
+        editLink: { id: linkId, name, url } 
+      });
+      setLinks(response.data.config.links);
+      alert('Link actualizado correctamente');
+    } catch (error) {
+      console.error('Error editing link:', error);
+      alert('Error al editar link');
+    }
+  };
+
+  const deleteLink = async (linkId: string, linkName: string) => {
+    if (!confirm(`¿Eliminar el link "${linkName}"? Esta acción no se puede deshacer.`)) return;
+    
+    try {
+      const response = await axios.put('/api/admin/links-config', { 
+        deleteLink: linkId 
+      });
+      setLinks(response.data.config.links);
+      alert('Link eliminado correctamente');
+    } catch (error) {
+      console.error('Error deleting link:', error);
+      alert('Error al eliminar link');
     }
   };
 
@@ -328,53 +383,86 @@ export default function AdminPanel() {
               </div>
               <p className="text-xs text-purple-300/70 mt-2">
                 {linksMode === 'single' 
-                  ? '📌 Solo se mostrará el link activo' 
-                  : '🔄 Se mostrarán ambos links alternándose'}
+                  ? '📌 Solo se usará el link activo en Paso 2' 
+                  : '🔄 Los links se alternarán automáticamente en Paso 2 (el usuario no lo notará)'}
               </p>
+            </div>
+
+            {/* Add New Link Button */}
+            <div className="mb-4">
+              <button
+                onClick={addNewLink}
+                className="px-4 py-2 rounded-lg font-bold text-sm bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                ➕ Agregar Nuevo Link
+              </button>
             </div>
 
             {/* Links List */}
             <div className="space-y-3">
-              {links.map((link) => (
-                <div key={link.id} className="glass-card p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-white">{link.name}</h3>
-                      <p className="text-xs sm:text-sm text-purple-300/70 break-all">
-                        {link.url}
-                      </p>
-                      <div className="mt-2 flex gap-4 text-sm">
-                        <span className="text-yellow-400">📊 Clics: <strong>{link.clicks}</strong></span>
-                        <span className={link.active ? 'text-green-400' : 'text-gray-400'}>
-                          {link.active ? '✅ Activo' : '⭕ Inactivo'}
-                        </span>
+              {links.length === 0 ? (
+                <div className="text-center py-8 glass-card">
+                  <p className="text-purple-300">No hay links configurados</p>
+                  <p className="text-xs text-purple-400 mt-2">Haz clic en "Agregar Nuevo Link" para crear uno</p>
+                </div>
+              ) : (
+                links.map((link) => (
+                  <div key={link.id} className="glass-card p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg text-white">{link.name}</h3>
+                        <p className="text-xs sm:text-sm text-purple-300/70 break-all">
+                          {link.url}
+                        </p>
+                        <div className="mt-2 flex gap-4 text-sm">
+                          <span className="text-yellow-400">📊 Clics: <strong>{link.clicks}</strong></span>
+                          <span className={link.active ? 'text-green-400' : 'text-gray-400'}>
+                            {link.active ? '✅ Activo' : '⭕ Inactivo'}
+                          </span>
+                          <span className={link.enabled ? 'text-blue-400' : 'text-gray-400'}>
+                            {link.enabled ? '👁️ Habilitado' : '🚫 Deshabilitado'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+                        <button
+                          onClick={() => setActiveLink(link.id)}
+                          disabled={link.active}
+                          className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
+                            link.active
+                              ? 'bg-green-600 text-white cursor-default'
+                              : 'bg-white/10 text-green-400 hover:bg-green-600/30'
+                          }`}
+                        >
+                          {link.active ? '✓ Activo' : 'Activar'}
+                        </button>
+                        <button
+                          onClick={() => toggleLink(link.id)}
+                          className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
+                            link.enabled
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-white/10 text-blue-400 hover:bg-blue-600/30'
+                          }`}
+                        >
+                          {link.enabled ? '👁️ Habilitar' : '🚫 Deshab.'}
+                        </button>
+                        <button
+                          onClick={() => editLink(link.id, link.name, link.url)}
+                          className="px-3 py-2 rounded-lg font-bold text-sm bg-white/10 text-purple-400 hover:bg-purple-600/30 transition-all"
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          onClick={() => deleteLink(link.id, link.name)}
+                          className="px-3 py-2 rounded-lg font-bold text-sm bg-white/10 text-red-400 hover:bg-red-600/30 transition-all"
+                        >
+                          🗑️ Eliminar
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                      <button
-                        onClick={() => setActiveLink(link.id)}
-                        className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
-                          link.active
-                            ? 'bg-green-600 text-white'
-                            : 'bg-white/10 text-green-400 hover:bg-green-600/30'
-                        }`}
-                      >
-                        {link.active ? '✓ Activo' : 'Activar'}
-                      </button>
-                      <button
-                        onClick={() => toggleLink(link.id)}
-                        className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
-                          link.enabled
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white/10 text-blue-400'
-                        }`}
-                      >
-                        {link.enabled ? '👁️ Visible' : '🚫 Oculto'}
-                      </button>
-                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             {/* Revenue Stats */}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import axios from 'axios';
 
-const AD_URL = 'https://omg10.com/4/9722913';
 const REQUIRED_SECONDS = 7;
 
 type PageState = 'ready' | 'watching' | 'success';
@@ -12,6 +12,8 @@ export default function AdVisit() {
   const [mounted, setMounted] = useState(false);
   const [pageState, setPageState] = useState<PageState>('ready');
   const [secondsLeft, setSecondsLeft] = useState(REQUIRED_SECONDS);
+  const [adUrl, setAdUrl] = useState<string>('');
+  const [loadingUrl, setLoadingUrl] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -21,10 +23,29 @@ export default function AdVisit() {
   }, []);
 
   // When state is 'ready', open ad and start timer
-  const handleStartAd = useCallback(() => {
-    // Start watching timer first
-    setSecondsLeft(REQUIRED_SECONDS);
-    setPageState('watching');
+  const handleStartAd = useCallback(async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Prevenir navegación por defecto
+    e.preventDefault();
+    
+    setLoadingUrl(true);
+    try {
+      // Obtener URL dinámica del sistema
+      const response = await axios.get('/api/get-redirect-link');
+      const redirectUrl = response.data.url;
+      
+      // Abrir el link en nueva pestaña
+      window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+      
+      // Start watching timer
+      setSecondsLeft(REQUIRED_SECONDS);
+      setPageState('watching');
+      setAdUrl(redirectUrl);
+    } catch (error) {
+      console.error('Error getting redirect link:', error);
+      alert('Error al obtener el enlace. Intenta de nuevo.');
+    } finally {
+      setLoadingUrl(false);
+    }
   }, []);
 
   // Countdown timer while user watches the ad in the other tab
@@ -89,17 +110,17 @@ export default function AdVisit() {
                 </p>
               </div>
               <a
-                href={AD_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#"
                 onClick={handleStartAd}
                 className="block w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg
                   bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700
                   text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40
                   transform hover:scale-[1.02] active:scale-95
-                  transition-all duration-300 text-center no-underline"
+                  transition-all duration-300 text-center no-underline
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ pointerEvents: loadingUrl ? 'none' : 'auto', opacity: loadingUrl ? 0.5 : 1 }}
               >
-                👁️ Abrir Anuncio y Empezar Contador
+                {loadingUrl ? '⏳ Cargando...' : '👁️ Abrir Anuncio y Empezar Contador'}
               </a>
               <button
                 onClick={handleGoToEntry2}
