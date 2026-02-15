@@ -34,8 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // GET - List files
   if (req.method === 'GET') {
     try {
-      // Get manifest from main branch
-      const manifestFile = await github.getFile('manifest.json');
+      // Get manifest from DATA branch to avoid builds
+      console.log('📋 Getting manifest from data branch for admin panel...');
+      const manifestFile = await githubData.getFile('manifest.json');
       
       if (!manifestFile) {
         return res.status(200).json({ files: [] });
@@ -95,15 +96,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fileBuffer = fs.readFileSync(file.filepath);
       const filename = file.originalFilename || 'unnamed';
 
-      // Upload to GitHub
+      // Upload to GitHub main branch
       const result = await github.uploadFile(
         `files/${filename}`,
         fileBuffer,
-        `Upload ${filename}`
+        `[DATA] Upload ${filename} [skip ci][skip netlify]`
       );
 
-      // Update manifest
-      const manifestFile = await github.getFile('manifest.json');
+      // Update manifest in DATA branch to avoid builds
+      console.log('📝 Updating manifest in data branch to avoid builds...');
+      const manifestFile = await githubData.getFile('manifest.json');
       let manifest: any = { files: [] };
       
       if (manifestFile) {
@@ -125,17 +127,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       manifest.files = manifest.files || [];
       manifest.files.push(newFile);
 
-      // Update manifest in main branch (file info only)
-      await github.createOrUpdateFile(
+      // Update manifest in DATA branch to avoid builds
+      await githubData.createOrUpdateFile(
         'manifest.json',
         JSON.stringify(manifest, null, 2),
-        `Add ${filename} to manifest`,
+        `[DATA] Add ${filename} to manifest [skip ci][skip netlify]`,
         manifestFile?.sha
       );
 
       // Initialize download stats in data branch to avoid Netlify builds
       try {
-        console.log('📊 Initializing download stats in data branch...');
+        console.log('📊 Initializing download stats in data branch to avoid builds...');
         
         let downloadStats: any = {};
         const downloadsFile = await githubData.getFile('downloads-stats.json');
@@ -179,8 +181,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'File ID required' });
       }
 
-      // Get manifest
-      const manifestFile = await github.getFile('manifest.json');
+      // Get manifest from DATA branch
+      console.log('📝 Getting manifest from data branch...');
+      const manifestFile = await githubData.getFile('manifest.json');
       
       if (!manifestFile) {
         return res.status(404).json({ error: 'No files found' });
@@ -195,20 +198,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'File not found' });
       }
 
-      // Delete from GitHub
+      // Delete from GitHub with skip build flags
       await github.deleteFile(
         `files/${fileItem.filename}`,
         fileItem.sha,
-        `Delete ${fileItem.filename}`
+        `[DATA] Delete ${fileItem.filename} [skip ci][skip netlify]`
       );
 
-      // Update manifest
+      // Update manifest in DATA branch to avoid builds
       manifest.files = manifest.files.filter((f: any) => f.id !== file);
       
-      await github.createOrUpdateFile(
+      await githubData.createOrUpdateFile(
         'manifest.json',
         JSON.stringify(manifest, null, 2),
-        `Remove ${fileItem.filename} from manifest`,
+        `[DATA] Remove ${fileItem.filename} from manifest [skip ci][skip netlify]`,
         manifestFile.sha
       );
 

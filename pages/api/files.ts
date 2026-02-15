@@ -7,11 +7,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const github = createGitHubService(); // Para leer manifest desde main
-    const githubData = createGitHubDataService(); // Para leer stats desde data
+    const github = createGitHubService(); // Para archivos físicos en main
+    const githubData = createGitHubDataService(); // Para manifest y stats en data
     
-    // Fetch manifest.json from GitHub main branch
-    const manifestFile = await github.getFile('manifest.json');
+    // Fetch manifest.json from GitHub DATA branch to avoid builds  
+    console.log('📋 Getting manifest from data branch to avoid triggering builds...');
+    const manifestFile = await githubData.getFile('manifest.json');
     
     if (!manifestFile) {
       return res.status(200).json({ files: [] });

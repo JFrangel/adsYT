@@ -9,6 +9,14 @@
 [context.branch-deploy]
   command = "echo 'Skipping build for non-main branch'"
 
+# Build settings for reduced unnecessary builds  
+[build.processing]
+  skip_processing = false
+
+# Ignore certain file patterns that shouldn't trigger builds
+[build.ignore]
+  command = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- files/ data/"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
