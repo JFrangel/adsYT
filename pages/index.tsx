@@ -26,7 +26,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Free Fire - Entrada 1</title>
+        <title>Free Fire - archivovs</title>
       </Head>
       
       <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
@@ -48,7 +48,7 @@ export default function Home() {
               </h1>
             </div>
             <p className="text-base sm:text-xl text-purple-200 font-medium px-4">
-              Desbloquea recursos exclusivos en 3 pasos
+              Desbloquea archivos exclusivos en 3 pasos
             </p>
             <div className="mt-4 flex justify-center gap-2">
               <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-orange-500 animate-pulse"></div>

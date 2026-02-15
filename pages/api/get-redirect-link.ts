@@ -21,16 +21,101 @@ interface LinksData {
 
 const configFile = path.join(process.cwd(), 'config', 'links.json');
 
-function getLinksConfig(): LinksData {
-  if (!fs.existsSync(configFile)) {
-    throw new Error('Links config not found');
+function ensureConfigDir() {
+  const configDir = path.dirname(configFile);
+  try {
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+  } catch (error) {
+    console.warn('Could not create config directory:', error);
   }
-  const data = fs.readFileSync(configFile, 'utf-8');
-  return JSON.parse(data);
+}
+
+function getLinksConfig(): LinksData {
+  try {
+    if (!fs.existsSync(configFile)) {
+      // Configuración por defecto si no existe el archivo
+      const defaultConfig: LinksData = {
+        mode: 'alternate',
+        links: [
+          {
+            id: 'monetag',
+            name: 'Monetag',
+            url: 'https://omg10.com/4/9722913',
+            clicks: 0,
+            enabled: true,
+            active: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          {
+            id: 'adsterra',
+            name: 'AdSterra',
+            url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
+            clicks: 0,
+            enabled: true,
+            active: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }
+        ]
+      };
+      
+      // Intentar crear el archivo, pero no fallar si no se puede
+      try {
+        ensureConfigDir();
+        fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
+      } catch (writeError) {
+        console.warn('Could not write default config file (read-only filesystem?):', writeError);
+      }
+      
+      return defaultConfig;
+    }
+    
+    const data = fs.readFileSync(configFile, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading config file:', error);
+    // Retornar configuración por defecto si hay error
+    return {
+      mode: 'alternate',
+      links: [
+        {
+          id: 'monetag',
+          name: 'Monetag',
+          url: 'https://omg10.com/4/9722913',
+          clicks: 0,
+          enabled: true,
+          active: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: 'adsterra',
+          name: 'AdSterra',
+          url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
+          clicks: 0,
+          enabled: true,
+          active: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }
+      ],
+      lastUsedIndex: undefined
+    };
+  }
 }
 
 function saveLinksConfig(config: LinksData) {
-  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+  try {
+    ensureConfigDir();
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+    return true;
+  } catch (error) {
+    console.warn('Could not save config (read-only filesystem?):', error);
+    return false;
+  }
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -69,8 +154,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       linkInConfig.updatedAt = Date.now();
     }
 
-    // Guardar cambios
-    saveLinksConfig(config);
+    // Intentar guardar cambios (puede fallar en sistem readonly como Netlify)
+    const saved = saveLinksConfig(config);
+    if (!saved) {
+      console.warn('Stats not saved (read-only filesystem). Link will still work.');
+    }
 
     return res.status(200).json({
       url: selectedLink.url,
@@ -79,6 +167,21 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error: any) {
     console.error('Error getting redirect link:', error);
-    return res.status(500).json({ error: 'Error getting redirect link' });
+    
+    // Intentar devolver un link por defecto incluso si hay error
+    try {
+      const fallbackUrl = 'https://omg10.com/4/9722913';
+      console.log('Using fallback URL:', fallbackUrl);
+      return res.status(200).json({
+        url: fallbackUrl,
+        linkId: 'monetag',
+        linkName: 'Monetag (Fallback)',
+      });
+    } catch (fallbackError) {
+      return res.status(500).json({ 
+        error: 'Error getting redirect link',
+        details: error.message 
+      });
+    }
   }
 }
