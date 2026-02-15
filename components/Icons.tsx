@@ -158,3 +158,43 @@ export const LoadingSpinner = ({ className = 'w-8 h-8' }: { className?: string }
     <circle cx="12" cy="12" r="10" />
   </svg>
 );
+
+export const LightBulbIcon = ({ className = 'w-8 h-8', animate = false }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={`${className} ${animate ? 'animate-pulse' : ''}`}
+  >
+    <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
+  </svg>
+);
+
+export const EyeIcon = ({ className = 'w-8 h-8', animate = false }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={`${className} ${animate ? 'animate-pulse' : ''}`}
+  >
+    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+  </svg>
+);
+
+export const HourglassIcon = ({ className = 'w-8 h-8', animate = false }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={`${className} ${animate ? 'animate-bounce' : ''}`}
+  >
+    <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z" />
+  </svg>
+);
+
+export const CelebrationIcon = ({ className = 'w-8 h-8', animate = false }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={`${className} ${animate ? 'animate-bounce' : ''}`}
+  >
+    <path d="M2 20h2c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1H2v-2h2c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1H2V9h2c.55 0 1-.45 1-1V7c0-.55-.45-1-1-1H2V4h2c.55 0 1-.45 1-1V2H3c-.55 0-1 .45-1 1v1H0v2h2v2H0v2h2v2H0v2h2v2H0v2h2v1c0 .55.45 1 1 1zm20-11.5c0-.83-.67-1.5-1.5-1.5h-3c-.83 0-1.5.67-1.5 1.5V10h6v-1.5zm-1.5 5.5H14v6c0 .55.45 1 1 1h5c.55 0 1-.45 1-1v-6h-1.5zM11 9H7.5C6.67 9 6 9.67 6 10.5V12h6v-1.5c0-.83-.67-1.5-1.5-1.5H11zm-.5 5H6v6c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-6h-.5z" />
+  </svg>
+);

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
 import HighPerformanceAd from '@/components/HighPerformanceAd';
+import { AnnouncementIcon, LightBulbIcon, EyeIcon, HourglassIcon, CelebrationIcon, CheckIcon } from '@/components/Icons';
 
 const REQUIRED_SECONDS = 7;
 
@@ -96,7 +97,9 @@ export default function AdVisit() {
           {/* ─── READY STATE ─── */}
           {pageState === 'ready' && (
             <>
-              <div className="text-5xl sm:text-6xl">📢</div>
+              <div className="flex justify-center">
+                <AnnouncementIcon className="w-16 h-16 sm:w-20 sm:h-20 text-blue-400" />
+              </div>
               <h2 className="text-xl sm:text-2xl font-bold text-white">
                 Verificación de Anuncio
               </h2>
@@ -106,29 +109,54 @@ export default function AdVisit() {
                 <strong className="text-yellow-400">{REQUIRED_SECONDS} segundos</strong>.
               </p>
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                <p className="text-blue-300 text-sm">
-                  💡 El contador aparecerá aquí para que sepas cuánto tiempo falta.
-                </p>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <LightBulbIcon className="w-5 h-5 text-blue-400" />
+                  <p className="text-blue-300 text-sm font-semibold">
+                    El contador aparecerá aquí para que sepas cuánto tiempo falta
+                  </p>
+                </div>
               </div>
-              <a
-                href="#"
-                onClick={handleStartAd}
-                className="block w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg
-                  bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700
-                  text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40
-                  transform hover:scale-[1.02] active:scale-95
-                  transition-all duration-300 text-center no-underline
-                  disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ pointerEvents: loadingUrl ? 'none' : 'auto', opacity: loadingUrl ? 0.5 : 1 }}
-              >
-                {loadingUrl ? '⏳ Cargando...' : '👁️ Abrir Anuncio y Empezar Contador'}
-              </a>
-              <button
-                onClick={handleGoToEntry2}
-                className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-              >
-                ← Volver al Paso 2
-              </button>
+
+              {/* Ad before button */}
+              <div className="mt-4 pt-4 border-t border-gray-700/50">
+                <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
+                <div className="w-full bg-gradient-to-r from-gray-800/50 to-blue-900/50 rounded-xl p-3 border border-gray-700/50">
+                  <HighPerformanceAd />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-3 w-full">
+                <a
+                  href="#"
+                  onClick={handleStartAd}
+                  className="w-full max-w-md py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg
+                    bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700
+                    text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40
+                    transform hover:scale-[1.02] active:scale-95
+                    transition-all duration-300 text-center no-underline
+                    flex items-center justify-center gap-2
+                    disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ pointerEvents: loadingUrl ? 'none' : 'auto', opacity: loadingUrl ? 0.5 : 1 }}
+                >
+                  {loadingUrl ? (
+                    <>
+                      <HourglassIcon className="w-5 h-5" />
+                      Cargando...
+                    </>
+                  ) : (
+                    <>
+                      <EyeIcon className="w-5 h-5" />
+                      Abrir Anuncio y Empezar Contador
+                    </>
+                  )}
+                </a>
+                <button
+                  onClick={handleGoToEntry2}
+                  className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+                >
+                  ← Volver al Paso 2
+                </button>
+              </div>
             </>
           )}
 
@@ -173,9 +201,12 @@ export default function AdVisit() {
                 </div>
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-bold text-white">
-                ⏳ Permanece en el anuncio
-              </h2>
+              <div className="flex items-center justify-center gap-2">
+                <HourglassIcon className="w-6 h-6 text-yellow-400" />
+                <h2 className="text-xl sm:text-2xl font-bold text-white">
+                  Permanece en el anuncio
+                </h2>
+              </div>
               <p className="text-gray-300 text-sm sm:text-base">
                 El anuncio se abrió en otra pestaña.
                 <br />
@@ -194,44 +225,65 @@ export default function AdVisit() {
               <p className="text-gray-500 text-xs">
                 {Math.round(progress)}% completado
               </p>
+
+              {/* Ad during waiting */}
+              <div className="mt-6 pt-4 border-t border-gray-700/50">
+                <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
+                <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-3 border border-gray-700/50">
+                  <HighPerformanceAd />
+                </div>
+              </div>
             </>
           )}
 
           {/* ─── SUCCESS STATE ─── */}
           {pageState === 'success' && (
             <>
-              <div className="text-6xl sm:text-7xl animate-bounce">�</div>
-              <h2 className="text-xl sm:text-2xl font-bold text-green-400">
-                ¡Anuncio Completado!
-              </h2>
+              <div className="flex justify-center">
+                <CelebrationIcon className="w-20 h-20 sm:w-24 sm:h-24 text-green-400" animate />
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <CheckIcon className="w-6 h-6 text-green-400" />
+                <h2 className="text-xl sm:text-2xl font-bold text-green-400">
+                  ¡Anuncio Completado!
+                </h2>
+              </div>
               <p className="text-gray-300 text-sm sm:text-base">
                 Has permanecido el tiempo necesario. Ya puedes cerrar la pestaña del anuncio
                 y continuar al siguiente paso.
               </p>
               <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4">
-                <p className="text-green-300 text-sm">✅ Verificación exitosa — {REQUIRED_SECONDS} segundos completados</p>
+                <div className="flex items-center justify-center gap-2">
+                  <CheckIcon className="w-5 h-5 text-green-300" />
+                  <p className="text-green-300 text-sm">Verificación exitosa — {REQUIRED_SECONDS} segundos completados</p>
+                </div>
               </div>
 
               {/* Additional ad section */}
-              <div className="mt-8 pt-6 border-t border-gray-700">
-                <p className="text-gray-400 text-xs mb-4 uppercase tracking-wider">Anuncio Adicional</p>
+              <div className="mt-6 pt-4 border-t border-gray-700">
+                <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
                 
                 {/* Ad container - responsive */}
-                <div className="w-full bg-gradient-to-r from-gray-800/50 to-purple-900/50 rounded-xl p-4 border border-gray-700/50">
+                <div className="w-full bg-gradient-to-r from-gray-800/50 to-green-900/50 rounded-xl p-3 border border-gray-700/50">
                   <HighPerformanceAd />
                 </div>
               </div>
 
-              <button
-                onClick={handleGoToEntry2}
-                className="w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg
-                  bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900
-                  shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40
-                  transform hover:scale-[1.02] active:scale-95
-                  transition-all duration-300"
-              >
-                Continuar →
-              </button>
+              <div className="flex justify-center w-full">
+                <button
+                  onClick={handleGoToEntry2}
+                  className="w-full max-w-md py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg
+                    bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900
+                    shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40
+                    transform hover:scale-[1.02] active:scale-95
+                    transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  Continuar
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
             </>
           )}
 

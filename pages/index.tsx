@@ -71,7 +71,7 @@ export default function Home() {
           {/* Ad Container */}
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
             <div className="text-purple-200 flex items-start gap-3">
-              <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
+              <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" />
               <div className="w-full">
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
                 <div className="mt-4 sm:mt-6">
