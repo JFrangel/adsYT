@@ -61,9 +61,20 @@ export default function Entry3() {
       // Open download link
       window.open(`/api/download?file=${file.id}`, '_blank');
       
-      // Redirect to ad-visit page after a brief delay to ensure download starts
-      setTimeout(() => {
-        router.push('/ad-visit');
+      // Wait for download to start, then redirect to ad link
+      setTimeout(async () => {
+        try {
+          // Get dynamic ad link from the system
+          const response = await axios.get('/api/get-redirect-link');
+          const adUrl = response.data.url;
+          
+          // Open ad link directly
+          window.open(adUrl, '_blank', 'noopener,noreferrer');
+        } catch (error) {
+          console.error('Error getting ad link:', error);
+          // Fallback to ad-visit page if link fetch fails
+          router.push('/ad-visit');
+        }
       }, 500);
     } catch (error) {
       console.error('Error downloading file:', error);
