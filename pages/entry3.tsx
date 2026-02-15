@@ -87,10 +87,10 @@ export default function Entry3() {
             console.log('🚀 Redirecting ad window to:', response.data.linkName);
             adWindow.location.href = adUrl;
           } else {
-            // Si el popup fue bloqueado, usar fallback
-            console.warn('Popup blocked, using fallback redirect');
-            // Redirigir en la misma pestaña
-            window.location.href = adUrl;
+            // Si el popup fue bloqueado, usar fallback en nueva pestaña
+            console.warn('Popup blocked, opening in new tab as fallback');
+            // Abrir en nueva pestaña como fallback
+            window.open(adUrl, '_blank', 'noopener,noreferrer');
           }
         }, 2000); // 2 segundos para asegurar que la descarga se inicie
         
@@ -100,9 +100,9 @@ export default function Entry3() {
         if (adWindow && !adWindow.closed) {
           adWindow.close();
         }
-        // Fallback a ad-visit después de delay
+        // Fallback a ad-visit en nueva pestaña después de delay
         setTimeout(() => {
-          router.push('/ad-visit');
+          window.open('/ad-visit', '_blank', 'noopener,noreferrer');
         }, 2000);
       }
       
