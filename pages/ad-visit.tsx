@@ -4,6 +4,8 @@ import Head from 'next/head';
 import axios from 'axios';
 import HighPerformanceAd from '@/components/HighPerformanceAd';
 import { AnnouncementIcon, LightBulbIcon, EyeIcon, HourglassIcon, CelebrationIcon, CheckIcon } from '@/components/Icons';
+import { AlertDialog } from '@/components/Dialog';
+import { useDialog } from '@/hooks/useDialog';
 
 const REQUIRED_SECONDS = 7;
 
@@ -16,6 +18,8 @@ export default function AdVisit() {
   const [secondsLeft, setSecondsLeft] = useState(REQUIRED_SECONDS);
   const [adUrl, setAdUrl] = useState<string>('');
   const [loadingUrl, setLoadingUrl] = useState(false);
+  
+  const { alertState, showAlert, closeAlert } = useDialog();
 
   useEffect(() => {
     setMounted(true);
@@ -44,11 +48,11 @@ export default function AdVisit() {
       setAdUrl(redirectUrl);
     } catch (error) {
       console.error('Error getting redirect link:', error);
-      alert('Error al obtener el enlace. Intenta de nuevo.');
+      showAlert('Error de Conexión', 'Error al obtener el enlace. Intenta de nuevo.', 'error');
     } finally {
       setLoadingUrl(false);
     }
-  }, []);
+  }, [showAlert]);
 
   // Countdown timer while user watches the ad in the other tab
   useEffect(() => {
@@ -289,6 +293,14 @@ export default function AdVisit() {
 
         </div>
       </main>
+
+      <AlertDialog
+        isOpen={alertState.isOpen}
+        onClose={closeAlert}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </>
   );
 }

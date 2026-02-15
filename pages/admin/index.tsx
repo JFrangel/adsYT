@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
 import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, LoadingSpinner } from '@/components/Icons';
+import { AlertDialog, ConfirmDialog, PromptDialog } from '@/components/Dialog';
+import { useDialog } from '@/hooks/useDialog';
 
 interface FileItem {
   id: string;
@@ -33,6 +35,20 @@ export default function AdminPanel() {
   const [links, setLinks] = useState<LinkConfig[]>([]);
   const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
   const [savingCheckpoint, setSavingCheckpoint] = useState(false);
+  const [refreshingClicks, setRefreshingClicks] = useState(false);
+  
+  // Dialog hooks
+  const {
+    alertState,
+    showAlert,
+    closeAlert,
+    confirmState,
+    showConfirm,
+    closeConfirm,
+    promptState,
+    showPrompt,
+    closePrompt,
+  } = useDialog();
 
   useEffect(() => {
     setMounted(true);
@@ -63,6 +79,19 @@ export default function AdminPanel() {
       setLinksMode(response.data.mode || 'single');
     } catch (error) {
       console.error('Error fetching links:', error);
+    }
+  };
+
+  const refreshClicks = async () => {
+    setRefreshingClicks(true);
+    try {
+      await fetchLinks();
+      showAlert('Clicks Actualizados', 'Los conteos de clicks se han actualizado correctamente', 'success');
+    } catch (error) {
+      showAlert('Error', 'No se pudieron actualizar los clicks', 'error');
+      console.error('Error refreshing clicks:', error);
+    } finally {
+      setRefreshingClicks(false);
     }
   };
 
@@ -97,75 +126,129 @@ export default function AdminPanel() {
     }
   };
 
-  const addNewLink = async () => {
-    const name = prompt('Nombre del link (ej: Monetag, AdSterra):');
-    if (!name) return;
-    
-    const url = prompt('URL del link:');
-    if (!url) return;
-    
-    try {
-      const response = await axios.put('/api/admin/links-config', { 
-        addLink: { name, url } 
-      });
-      setLinks(response.data.config.links);
-      alert('Link agregado correctamente');
-    } catch (error) {
-      console.error('Error adding link:', error);
-      alert('Error al agregar link');
-    }
+  const addNewLink = () => {
+    showPrompt(
+      'Agregar Nuevo Link',
+      'Nombre del link (ej: Monetag, AdSterra):',
+      (name) => {
+        // Segundo prompt para URL
+        showPrompt(
+          'URL del Link',
+          `URL para ${name}:`,
+          async (url) => {
+            try {
+              const response = await axios.put('/api/admin/links-config', { 
+                addLink: { name, url } 
+              });
+              setLinks(response.data.config.links);
+              showAlert('Link Agregado', 'Link agregado correctamente', 'success');
+            } catch (error) {
+              console.error('Error adding link:', error);
+              showAlert('Error', 'Error al agregar link', 'error');
+            }
+          },
+          {
+            placeholder: 'https://ejemplo.com/link',
+            inputType: 'url'
+          }
+        );
+      },
+      {
+        placeholder: 'Nombre del servicio'
+      }
+    );
   };
 
-  const editLink = async (linkId: string, currentName: string, currentUrl: string) => {
-    const name = prompt('Nuevo nombre:', currentName);
-    if (!name) return;
-    
-    const url = prompt('Nuevo URL:', currentUrl);
-    if (!url) return;
-    
-    try {
-      const response = await axios.put('/api/admin/links-config', { 
-        editLink: { id: linkId, name, url } 
-      });
-      setLinks(response.data.config.links);
-      alert('Link actualizado correctamente');
-    } catch (error) {
-      console.error('Error editing link:', error);
-      alert('Error al editar link');
-    }
+  const editLink = (linkId: string, currentName: string, currentUrl: string) => {
+    showPrompt(
+      'Editar Link',
+      'Nuevo nombre del link:',
+      (name) => {
+        showPrompt(
+          'Editar URL',
+          `Nuevo URL para ${name}:`,
+          async (url) => {
+            try {
+              const response = await axios.put('/api/admin/links-config', { 
+                editLink: { id: linkId, name, url } 
+              });
+              setLinks(response.data.config.links);
+              showAlert('Link Actualizado', 'Link actualizado correctamente', 'success');
+            } catch (error) {
+              console.error('Error editing link:', error);
+              showAlert('Error', 'Error al editar link', 'error');
+            }
+          },
+          {
+            placeholder: 'https://ejemplo.com/link',
+            defaultValue: currentUrl,
+            inputType: 'url'
+          }
+        );
+      },
+      {
+        placeholder: 'Nombre del servicio',
+        defaultValue: currentName
+      }
+    );
   };
 
-  const deleteLink = async (linkId: string, linkName: string) => {
-    if (!confirm(`¿Eliminar el link "${linkName}"? Esta acción no se puede deshacer.`)) return;
-    
-    try {
-      const response = await axios.put('/api/admin/links-config', { 
-        deleteLink: linkId 
-      });
-      setLinks(response.data.config.links);
-      alert('Link eliminado correctamente');
-    } catch (error) {
-      console.error('Error deleting link:', error);
-      alert('Error al eliminar link');
-    }
+  const deleteLink = (linkId: string, linkName: string) => {
+    showConfirm(
+      'Eliminar Link',
+      `¿Eliminar el link "${linkName}"?\n\nEsta acción no se puede deshacer.`,
+      async () => {
+        try {
+          const response = await axios.put('/api/admin/links-config', { 
+            deleteLink: linkId 
+          });
+          setLinks(response.data.config.links);
+          showAlert('Link Eliminado', 'Link eliminado correctamente', 'success');
+        } catch (error) {
+          console.error('Error deleting link:', error);
+          showAlert('Error', 'Error al eliminar link', 'error');
+        }
+      },
+      {
+        type: 'error',
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar'
+      }
+    );
   };
 
-  const saveCheckpoint = async () => {
-    if (!confirm('¿Guardar checkpoint de clicks actual a GitHub? Se guardará un commit con el estado actual.')) return;
-    
-    setSavingCheckpoint(true);
-    try {
-      const response = await axios.post('/api/admin/save-checkpoint');
-      alert(`✅ Checkpoint guardado: Monetag ${response.data.clicks.monetag} | AdSterra ${response.data.clicks.adsterra}`);
-      // Refrescar datos para mostrar confirmación
-      await fetchLinks();
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.error || error.message;
-      alert(`❌ Error al guardar checkpoint: ${errorMsg}\n\nVerifica que GITHUB_TOKEN esté configurado en las variables de entorno.`);
-      console.error('Error saving checkpoint:', error);
-    } finally {
-      setSavingCheckpoint(false);
-    }
+  const saveCheckpoint = () => {
+    showConfirm(
+      'Guardar Checkpoint',
+      '¿Guardar checkpoint de clicks actual a GitHub?\n\nSe guardará un commit con el estado actual.',
+      async () => {
+        setSavingCheckpoint(true);
+        try {
+          const response = await axios.post('/api/admin/save-checkpoint');
+          showAlert(
+            'Checkpoint Guardado',
+            `Monetag: ${response.data.clicks.monetag} clicks\nAdSterra: ${response.data.clicks.adsterra} clicks`,
+            'success'
+          );
+          await fetchLinks();
+        } catch (error: any) {
+          const errorMsg = error.response?.data?.error || error.message;
+          showAlert(
+            'Error al Guardar',
+            `Error: ${errorMsg}\n\nVerifica que GITHUB_TOKEN esté configurado en las variables de entorno.`,
+            'error'
+          );
+          console.error('Error saving checkpoint:', error);
+        } finally {
+          setSavingCheckpoint(false);
+        }
+      },
+      {
+        type: 'info',
+        confirmText: 'Guardar',
+        cancelText: 'Cancelar'
+      }
+    );
   };
 
   const fetchFiles = async () => {
@@ -192,26 +275,35 @@ export default function AdminPanel() {
         },
       });
 
-      alert('Archivo subido correctamente');
+      showAlert('Archivo Subido', 'Archivo subido correctamente', 'success');
       fetchFiles();
       (e.target as HTMLFormElement).reset();
     } catch (error: any) {
-      alert('Error al subir archivo: ' + (error.response?.data?.error || error.message));
+      showAlert('Error', 'Error al subir archivo: ' + (error.response?.data?.error || error.message), 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDelete = async (fileId: string, filename: string) => {
-    if (!confirm(`¿Eliminar ${filename}?`)) return;
-
-    try {
-      await axios.delete(`/api/admin/files?file=${fileId}`);
-      alert('Archivo eliminado');
-      fetchFiles();
-    } catch (error: any) {
-      alert('Error al eliminar: ' + (error.response?.data?.error || error.message));
-    }
+  const handleDelete = (fileId: string, filename: string) => {
+    showConfirm(
+      'Eliminar Archivo',
+      `¿Eliminar ${filename}?\n\nEsta acción no se puede deshacer.`,
+      async () => {
+        try {
+          await axios.delete(`/api/admin/files?file=${fileId}`);
+          showAlert('Archivo Eliminado', 'Archivo eliminado correctamente', 'success');
+          fetchFiles();
+        } catch (error: any) {
+          showAlert('Error', 'Error al eliminar: ' + (error.response?.data?.error || error.message), 'error');
+        }
+      },
+      {
+        type: 'error',
+        confirmText: 'Eliminar',
+        cancelText: 'Cancelar'
+      }
+    );
   };
 
   const handleLogout = async () => {
@@ -354,6 +446,9 @@ export default function AdminPanel() {
                         <p className="text-xs sm:text-sm text-purple-300">
                           {file.filename} • {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.downloads} descargas
                         </p>
+                        <p className="text-xs text-purple-400/80 mt-1">
+                          Subido: {new Date(file.uploadedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
                       <button
                         onClick={() => handleDelete(file.id, file.filename)}
@@ -450,6 +545,17 @@ export default function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Agregar Nuevo Link
+              </button>
+              
+              <button
+                onClick={refreshClicks}
+                disabled={refreshingClicks}
+                className="px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:from-purple-600 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className={`w-5 h-5 ${refreshingClicks ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {refreshingClicks ? 'Actualizando...' : 'Actualizar Clicks'}
               </button>
               
               <button
@@ -633,6 +739,37 @@ export default function AdminPanel() {
           </div>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <AlertDialog
+        isOpen={alertState.isOpen}
+        onClose={closeAlert}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm || (() => {})}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+      />
+
+      <PromptDialog
+        isOpen={promptState.isOpen}
+        onClose={closePrompt}
+        onSubmit={promptState.onSubmit || (() => {})}
+        title={promptState.title}
+        message={promptState.message}
+        placeholder={promptState.placeholder}
+        defaultValue={promptState.defaultValue}
+        type={promptState.inputType}
+      />
     </>
   );
 }

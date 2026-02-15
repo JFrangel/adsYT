@@ -4,6 +4,8 @@ import Head from 'next/head';
 import axios from 'axios';
 import { FileIcon, DownloadIcon, AnnouncementIcon, CheckIcon, FolderIcon, ArrowIcon } from '@/components/Icons';
 import HighPerformanceAd from '@/components/HighPerformanceAd';
+import { AlertDialog } from '@/components/Dialog';
+import { useDialog } from '@/hooks/useDialog';
 
 interface FileItem {
   id: string;
@@ -19,6 +21,8 @@ export default function Entry3() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  
+  const { alertState, showAlert, closeAlert } = useDialog();
 
   useEffect(() => {
     setMounted(true);
@@ -56,9 +60,14 @@ export default function Entry3() {
       
       // Open download link
       window.open(`/api/download?file=${file.id}`, '_blank');
+      
+      // Redirect to ad-visit page after a brief delay to ensure download starts
+      setTimeout(() => {
+        router.push('/ad-visit');
+      }, 500);
     } catch (error) {
       console.error('Error downloading file:', error);
-      alert('Error al descargar el archivo. Intenta de nuevo.');
+      showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
     }
   };
 
@@ -186,6 +195,15 @@ export default function Entry3() {
           </div>
         </div>
       </div>
+
+      {/* Dialog */}
+      <AlertDialog
+        isOpen={alertState.isOpen}
+        onClose={closeAlert}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </>
   );
 }
