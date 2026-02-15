@@ -27,7 +27,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Free Fire - archivovs</title>
+        <title>Free Fire - archivos</title>
       </Head>
       
       <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
@@ -71,7 +71,7 @@ export default function Home() {
           {/* Ad Container */}
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
             <div className="text-purple-200 flex items-start gap-3">
-              <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400" />
+               
               <div className="w-full">
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
                 <div className="mt-4 sm:mt-6">
