@@ -69,27 +69,29 @@ export default function Entry3() {
         const response = await axios.get('/api/get-redirect-link');
         const adUrl = response.data.url;
         
-        // Si la ventana sigue abierta, redirigir a la URL real
-        if (adWindow && !adWindow.closed) {
-          adWindow.location.href = adUrl;
-        } else {
-          // Si el popup fue bloqueado, usar fallback
-          console.warn('Popup blocked, using fallback redirect');
-          // Pequeño delay para que la descarga se inicie, luego redirigir en la misma pestaña
-          setTimeout(() => {
+        // Esperar 2 segundos para que la descarga se inicie completamente
+        setTimeout(() => {
+          // Si la ventana sigue abierta, redirigir a la URL real
+          if (adWindow && !adWindow.closed) {
+            adWindow.location.href = adUrl;
+          } else {
+            // Si el popup fue bloqueado, usar fallback
+            console.warn('Popup blocked, using fallback redirect');
+            // Redirigir en la misma pestaña
             window.location.href = adUrl;
-          }, 1000);
-        }
+          }
+        }, 2000); // 2 segundos para asegurar que la descarga se inicie
+        
       } catch (error) {
         console.error('Error getting ad link:', error);
         // Cerrar ventana vacía si hay error
         if (adWindow && !adWindow.closed) {
           adWindow.close();
         }
-        // Fallback a ad-visit
+        // Fallback a ad-visit después de delay
         setTimeout(() => {
           router.push('/ad-visit');
-        }, 1000);
+        }, 2000);
       }
       
     } catch (error) {
