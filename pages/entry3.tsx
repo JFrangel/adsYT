@@ -149,9 +149,17 @@ export default function Entry3() {
                 <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
                 <div className="mt-4 sm:mt-6">
                   <script dangerouslySetInnerHTML={{
-                    __html: `<script async="async" data-cfasync="false" src="https://pl28720684.effectivegatecpm.com/0dae18a90e9b6c10cbe9412694b8c64c/invoke.js"></script>`
+                    __html: `
+                      atOptions = {
+                        'key' : '31c0c92d4caf313cccc48dfa4c10e085',
+                        'format' : 'iframe',
+                        'height' : 250,
+                        'width' : 300,
+                        'params' : {}
+                      };
+                    `
                   }} />
-                  <div id="container-0dae18a90e9b6c10cbe9412694b8c64c"></div>
+                  <script src="https://www.highperformanceformat.com/31c0c92d4caf313cccc48dfa4c10e085/invoke.js"></script>
                 </div>
               </div>
             </div>
