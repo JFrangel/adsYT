@@ -102,13 +102,7 @@ export default function Entry2() {
                 </div>
               </div>
 
-              {/* Ad in success state */}
-              <div className="pt-4 border-t border-gray-700/50">
-                <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider text-center">Anuncio</p>
-                <div className="w-full bg-gradient-to-r from-gray-800/50 to-green-900/50 rounded-xl p-3 border border-gray-700/50">
-                  <HighPerformanceAd />
-                </div>
-              </div>
+             
             </>
           ) : (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
