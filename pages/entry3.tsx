@@ -13,18 +13,9 @@ interface FileItem {
   downloads: number;
 }
 
-interface LinkOption {
-  id: string;
-  name: string;
-  url: string;
-  clicks?: number;
-  enabled?: boolean;
-}
-
 export default function Entry3() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [links, setLinks] = useState<LinkOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -44,7 +35,6 @@ export default function Entry3() {
     // This way user can actually enter Paso 3
     sessionStorage.removeItem('entry2_completed');
     fetchFiles();
-    fetchLinks();
   }, [router]);
 
   const fetchFiles = async () => {
@@ -54,30 +44,6 @@ export default function Entry3() {
     } catch (error) {
       console.error('Error fetching files:', error);
     }
-  };
-
-  const fetchLinks = async () => {
-    try {
-      const response = await axios.get('/api/admin/links-config');
-      const enabledLinks = response.data.links.filter((l: any) => l.enabled);
-      setLinks(enabledLinks);
-    } catch (error) {
-      console.error('Error fetching links:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLinkClick = async (link: LinkOption) => {
-    try {
-      // Track the click
-      await axios.post('/api/admin/links-config', { linkId: link.id });
-    } catch (error) {
-      console.error('Error tracking click:', error);
-    }
-    
-    // Open link in new window
-    window.open(link.url, '_blank');
   };
 
   const handleDownload = async (file: FileItem) => {
@@ -218,38 +184,6 @@ export default function Entry3() {
               </div>
             )}
           </div>
-
-          {/* Direct Links Section */}
-          {links.length > 0 && (
-            <div className="card mt-6 sm:mt-8 animate-fade-in" style={{animationDelay: '0.6s'}}>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
-                📍 Links Directos
-              </h2>
-              
-              <div className="space-y-3 sm:space-y-4">
-                {links.map((link, index) => (
-                  <button
-                    key={link.id}
-                    onClick={() => handleLinkClick(link)}
-                    className="w-full p-4 sm:p-6 rounded-lg bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/40 hover:to-cyan-500/40 border border-blue-400/30 hover:border-blue-300 text-left transition-all duration-300 transform hover:scale-105 group text-white animate-fade-in"
-                    style={{animationDelay: `${0.1 * index}s`}}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg sm:text-xl mb-1 group-hover:text-blue-300 transition-colors">
-                          {link.name}
-                        </h3>
-                        <p className="text-xs sm:text-sm text-blue-200/70">
-                          Clics: {link.clicks || 0}
-                        </p>
-                      </div>
-                      <ArrowIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300 group-hover:translate-x-2 transition-transform" animate={true} />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="mt-6 sm:mt-8 text-center">
             <div className="inline-flex items-center gap-2 glass-card px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
