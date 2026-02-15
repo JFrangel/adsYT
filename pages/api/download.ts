@@ -6,7 +6,10 @@ import path from 'path';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { file } = req.query;
 
-  if (!file) {
+  // Ensure file is a string (req.query can be string[])
+  const fileId = Array.isArray(file) ? file[0] : file;
+
+  if (!fileId) {
     return res.status(400).json({ error: 'File ID required' });
   }
 
@@ -24,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
     const manifest = JSON.parse(content);
     
-    const fileItem = manifest.files?.find((f: any) => f.id === file);
+    const fileItem = manifest.files?.find((f: any) => f.id === fileId);
     
     if (!fileItem) {
       return res.status(404).json({ error: 'File not found' });
@@ -47,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         // Update download count
-        downloadStats[file] = (downloadStats[file] || 0) + 1;
+        downloadStats[fileId] = (downloadStats[fileId] || 0) + 1;
         
         // Save to data branch
         const updatedStats = JSON.stringify(downloadStats, null, 2);
@@ -58,10 +61,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           downloadStatsSha
         );
         
-        console.log(`✅ Download count updated: ${fileItem.name} now has ${downloadStats[file]} downloads`);
+        console.log(`✅ Download count updated: ${fileItem.name} now has ${downloadStats[fileId]} downloads`);
         return res.status(200).json({ 
           success: true, 
-          downloads: downloadStats[file],
+          downloads: downloadStats[fileId],
           message: 'Saved to data branch - no build triggered' 
         });
         
