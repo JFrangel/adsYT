@@ -171,6 +171,9 @@ export default function Entry3() {
                           <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 inline ml-1 mr-1" />
                           {file.downloads} descargas
                         </p>
+                        <p className="text-xs text-purple-400/70 mt-1">
+                          Subido: {new Date(file.uploadedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
                       </div>
                       <button
                         onClick={() => handleDownload(file)}
