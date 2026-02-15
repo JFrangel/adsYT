@@ -23,23 +23,68 @@ const configFile = path.join(process.cwd(), 'config', 'links.json');
 // Crear directorio config si no existe
 function ensureConfigDir() {
   const configDir = path.dirname(configFile);
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
+  try {
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+  } catch (error) {
+    console.warn('Could not create config directory:', error);
   }
 }
 
 // Obtener configuración de links
 function getLinksConfig(): LinksData {
-  ensureConfigDir();
-  
-  if (!fs.existsSync(configFile)) {
-    const defaultConfig: LinksData = {
-      mode: 'single',
+  try {
+    ensureConfigDir();
+    
+    if (!fs.existsSync(configFile)) {
+      const defaultConfig: LinksData = {
+        mode: 'alternate',
+        links: [
+          {
+            id: 'monetag',
+            name: 'Monetag',
+            url: 'https://omg10.com/4/9722913',
+            clicks: 0,
+            enabled: true,
+            active: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          {
+            id: 'adsterra',
+            name: 'AdSterra',
+            url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
+            clicks: 0,
+            enabled: true,
+            active: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }
+        ]
+      };
+      
+      try {
+        fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
+      } catch (writeError) {
+        console.warn('Could not write default config (read-only filesystem):', writeError);
+      }
+      
+      return defaultConfig;
+    }
+    
+    const data = fs.readFileSync(configFile, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading config, using defaults:', error);
+    // Retornar configuración por defecto si hay cualquier error
+    return {
+      mode: 'alternate',
       links: [
         {
           id: 'monetag',
           name: 'Monetag',
-          url: 'https://gizokraijaw.net/vignette.min.js',
+          url: 'https://omg10.com/4/9722913',
           clicks: 0,
           enabled: true,
           active: true,
@@ -47,8 +92,8 @@ function getLinksConfig(): LinksData {
           updatedAt: Date.now(),
         },
         {
-          id: 'adterra',
-          name: 'AdTerra',
+          id: 'adsterra',
+          name: 'AdSterra',
           url: 'https://www.effectivegatecpm.com/myp26ea7?key=eafcdb4cf323eb02772929a09be0ceb5',
           clicks: 0,
           enabled: true,
@@ -58,19 +103,19 @@ function getLinksConfig(): LinksData {
         }
       ]
     };
-    
-    fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
-    return defaultConfig;
   }
-  
-  const data = fs.readFileSync(configFile, 'utf-8');
-  return JSON.parse(data);
 }
 
 // Guardar configuración de links
-function saveLinksConfig(config: LinksData) {
-  ensureConfigDir();
-  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+function saveLinksConfig(config: LinksData): boolean {
+  try {
+    ensureConfigDir();
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+    return true;
+  } catch (error) {
+    console.warn('Could not save config (read-only filesystem):', error);
+    return false;
+  }
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -103,13 +148,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       link.clicks += 1;
       link.updatedAt = Date.now();
       
-      saveLinksConfig(config);
+      const saved = saveLinksConfig(config);
+      if (!saved) {
+        console.warn('Click count updated but not persisted (read-only filesystem)');
+      }
       
       return res.status(200).json({
         success: true,
         link: link,
+        persisted: saved,
       });
     } catch (error: any) {
+      console.error('Error updating click count:', error);
       return res.status(500).json({ error: 'Error updating click count' });
     }
   }
@@ -182,13 +232,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
       
-      saveLinksConfig(config);
+      const saved = saveLinksConfig(config);
+      if (!saved) {
+        console.warn('Config updated but not persisted (read-only filesystem)');
+      }
       
       return res.status(200).json({
         success: true,
         config: config,
+        persisted: saved,
       });
     } catch (error: any) {
+      console.error('Error updating links config:', error);
       return res.status(500).json({ error: 'Error updating links config' });
     }
   }
