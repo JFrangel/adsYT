@@ -55,27 +55,39 @@ export default function Entry3() {
 
   const handleDownload = async (file: FileItem) => {
     try {
-      // Track download
-      await axios.post(`/api/download?file=${file.id}`);
+      // Para iOS/Safari: obtener la URL del ad ANTES de abrir ventanas
+      // Así window.open() está sincrónico con el evento del usuario
+      const adLinkPromise = axios.get('/api/get-redirect-link');
       
-      // Open download link
-      window.open(`/api/download?file=${file.id}`, '_blank');
+      // Abrir ventanas INMEDIATAMENTE (sincrónico con el click del usuario)
+      const downloadWindow = window.open(`/api/download?file=${file.id}`, '_blank');
+      const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // Wait for download to start, then redirect to ad link
-      setTimeout(async () => {
-        try {
-          // Get dynamic ad link from the system
-          const response = await axios.get('/api/get-redirect-link');
-          const adUrl = response.data.url;
-          
-          // Open ad link directly
-          window.open(adUrl, '_blank', 'noopener,noreferrer');
-        } catch (error) {
-          console.error('Error getting ad link:', error);
-          // Fallback to ad-visit page if link fetch fails
+      // Track download (no bloqueante)
+      axios.post(`/api/download?file=${file.id}`).catch(console.error);
+      
+      // Esperar por la respuesta del ad link
+      try {
+        const response = await adLinkPromise;
+        const adUrl = response.data.url;
+        
+        // Redirigir la ventana de anuncio a la URL obtenida
+        if (adWindow && !adWindow.closed) {
+          adWindow.location.href = adUrl;
+        } else if (!downloadWindow || downloadWindow.closed) {
+          // Si ambas ventanas fueron bloqueadas, abrir en la misma pestaña
+          window.location.href = adUrl;
+        }
+      } catch (error) {
+        console.error('Error getting ad link:', error);
+        // Si hay error, cerrar ventana vacía y redirigir a ad-visit
+        if (adWindow && !adWindow.closed) {
+          adWindow.close();
+        }
+        if (!downloadWindow || downloadWindow.closed) {
           router.push('/ad-visit');
         }
-      }, 500);
+      }
     } catch (error) {
       console.error('Error downloading file:', error);
       showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
