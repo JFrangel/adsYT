@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await githubData.createOrUpdateFile(
           'downloads-stats.json',
           updatedStats,
-          `Update download count for ${fileItem.name} [skip ci]`,
+          `[DATA] Update download stats for ${fileItem.name} [skip ci][skip netlify]`,
           downloadStatsSha
         );
         
@@ -71,23 +71,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (dataError: any) {
         console.error('❌ Error updating download stats in data branch:', dataError);
         
-        // Fallback: try to use main branch (this will trigger build)
-        console.log('⚠️ Fallback: updating manifest in main branch (will trigger build)');
-        
-        fileItem.downloads = (fileItem.downloads || 0) + 1;
-        const updatedManifest = JSON.stringify(manifest, null, 2);
-        
-        await github.createOrUpdateFile(
-          'manifest.json',
-          updatedManifest,
-          `Update download count for ${fileItem.name}`,
-          manifestFile.sha
-        );
-
-        return res.status(200).json({ 
-          success: true, 
-          downloads: fileItem.downloads,
-          message: 'Fallback: saved to main branch' 
+        // No fallback to main - just return error to avoid builds
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to update download stats in data branch',
+          details: dataError.message,
+          message: 'Download stats not updated to avoid triggering builds'
         });
       }
     }

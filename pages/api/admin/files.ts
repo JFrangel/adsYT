@@ -150,7 +150,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await githubData.createOrUpdateFile(
           'downloads-stats.json',
           JSON.stringify(downloadStats, null, 2),
-          `Initialize download stats for ${filename} [skip ci]`,
+          `[DATA] Initialize download stats for ${filename} [skip ci][skip netlify]`,
           downloadsFile?.sha
         );
         
