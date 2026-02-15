@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
+import { FileIcon, DownloadIcon, AnnouncementIcon, CheckIcon, FolderIcon } from '@/components/Icons';
 
 interface FileItem {
   id: string;
@@ -95,8 +96,9 @@ export default function Entry3() {
         <div className="max-w-5xl mx-auto relative z-10">
           <div className="card mb-6 sm:mb-8 text-center animate-fade-in">
             <div className="inline-block animate-float">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-4">
-                <span className="gradient-text">🎉 ¡Descargas!</span>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-4 flex items-center justify-center gap-3 sm:gap-4">
+                <span>¡Descargas!</span>
+                <CheckIcon className="w-10 h-10 sm:w-14 sm:h-14 text-green-400" animate />
               </h1>
             </div>
             <p className="text-lg sm:text-xl lg:text-2xl text-green-200 font-medium">
@@ -111,15 +113,21 @@ export default function Entry3() {
 
           {/* Ad Container */}
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <div className="text-green-200">
-              <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">📢 Anuncio</p>
-              <p className="text-sm sm:text-base opacity-90">Espacio para anuncio final</p>
+            <div className="text-green-200 flex items-start gap-3">
+              <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
+              <div>
+                <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
+                <p className="text-sm sm:text-base opacity-90">Espacio para anuncio final</p>
+              </div>
             </div>
           </div>
 
           {/* Files List */}
           <div className="card animate-fade-in" style={{animationDelay: '0.4s'}}>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text">Archivos Disponibles</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
+              <FolderIcon className="w-7 h-7 sm:w-8 sm:h-8" />
+              Archivos Disponibles
+            </h2>
             
             {loading ? (
               <div className="text-center py-12 sm:py-16">
@@ -144,18 +152,22 @@ export default function Entry3() {
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex-1">
-                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2 group-hover:text-purple-300 transition-colors">
-                          📦 {file.name}
+                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2 group-hover:text-purple-300 transition-colors flex items-center gap-2">
+                          <FileIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          {file.name}
                         </h3>
                         <p className="text-xs sm:text-sm text-purple-300/80">
-                          {(file.size / (1024 * 1024)).toFixed(2)} MB • ⬇️ {file.downloads} descargas
+                          {(file.size / (1024 * 1024)).toFixed(2)} MB • 
+                          <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 inline ml-1 mr-1" />
+                          {file.downloads} descargas
                         </p>
                       </div>
                       <button
                         onClick={() => handleDownload(file)}
-                        className="btn-primary group-hover:scale-105 w-full sm:w-auto text-base sm:text-lg"
+                        className="btn-primary group-hover:scale-105 w-full sm:w-auto text-base sm:text-lg flex items-center justify-center gap-2"
                       >
-                        ⬇️ Descargar
+                        <DownloadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        Descargar
                       </button>
                     </div>
                   </div>
@@ -166,7 +178,8 @@ export default function Entry3() {
 
           <div className="mt-6 sm:mt-8 text-center">
             <div className="inline-flex items-center gap-2 glass-card px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-              <span className="text-green-400 font-bold text-sm sm:text-base lg:text-lg">✅ Paso 3 de 3</span>
+              <CheckIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
+              <span className="text-green-400 font-bold text-sm sm:text-base lg:text-lg">Paso 3 de 3</span>
               <span className="text-green-300 text-sm sm:text-base">- Completado</span>
             </div>
           </div>

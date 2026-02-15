@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TimerButton from '@/components/TimerButton';
+import { FireIcon, LockIcon, AnnouncementIcon, ArrowIcon } from '@/components/Icons';
 import Head from 'next/head';
 
 export default function Home() {
@@ -40,7 +41,10 @@ export default function Home() {
           <div className="text-center mb-8 sm:mb-10">
             <div className="inline-block animate-float">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black mb-3 sm:mb-4">
-                <span className="gradient-text">🔥 Free Fire</span>
+                <span className="gradient-text flex items-center justify-center gap-2 sm:gap-3">
+                  <FireIcon className="w-10 h-10 sm:w-14 sm:h-14 text-orange-500" animate />
+                  Free Fire
+                </span>
               </h1>
             </div>
             <p className="text-base sm:text-xl text-purple-200 font-medium px-4">
@@ -57,18 +61,22 @@ export default function Home() {
             <TimerButton
               duration={8}
               onComplete={handleTimerComplete}
-              label="🔓 Desbloquear"
-              completedLabel="✅ Desbloqueado"
+              label="Desbloquear"
+              completedLabel="Desbloqueado"
+              showIcons
             />
           </div>
 
           {/* Ad Container */}
           <div className="ad-container mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <div className="text-purple-200">
-              <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">📢 Anuncio</p>
-              <p className="text-sm sm:text-base opacity-90">Espacio para anuncio (configurable por admin)</p>
-              <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-purple-300/70">
-                [Este espacio mostrará un anuncio real]
+            <div className="text-purple-200 flex items-start gap-3">
+              <AnnouncementIcon className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1 text-yellow-400" animate />
+              <div>
+                <p className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">Anuncio</p>
+                <p className="text-sm sm:text-base opacity-90">Espacio para anuncio (configurable por admin)</p>
+                <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-purple-300/70">
+                  [Este espacio mostrará un anuncio real]
+                </div>
               </div>
             </div>
           </div>
@@ -78,22 +86,21 @@ export default function Home() {
               <button 
                 onClick={handleContinue} 
                 disabled={!canContinue}
-                className={`btn-secondary text-lg sm:text-xl lg:text-2xl group w-full sm:w-auto ${
+                className={`btn-secondary text-lg sm:text-xl lg:text-2xl group w-full sm:w-auto flex items-center justify-center gap-2 ${
                   !canContinue ? 'opacity-50 cursor-not-allowed hover:scale-100' : ''
                 }`}
               >
-                <span className="flex items-center justify-center gap-2">
-                  {canContinue ? (
-                    <>
-                      Continuar a Paso 2
-                      <span className="group-hover:translate-x-2 transition-transform">→</span>
-                    </>
-                  ) : (
-                    <>
-                      🔒 Completa el timer para continuar
-                    </>
-                  )}
-                </span>
+                {canContinue ? (
+                  <>
+                    Continuar a Paso 2
+                    <ArrowIcon className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-2 transition-transform" />
+                  </>
+                ) : (
+                  <>
+                    <LockIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    Completa el timer para continuar
+                  </>
+                )}
               </button>
             </div>
           )}

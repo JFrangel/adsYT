@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
+import { UnlockIcon, CheckIcon, TimerIcon } from './Icons';
 
 interface TimerButtonProps {
   duration: number;
   onComplete: () => void;
   label?: string;
   completedLabel?: string;
+  showIcons?: boolean;
 }
 
 export default function TimerButton({ 
   duration, 
   onComplete, 
   label = 'Desbloquear',
-  completedLabel = 'Continuar'
+  completedLabel = 'Continuar',
+  showIcons = false
 }: TimerButtonProps) {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isRunning, setIsRunning] = useState(false);
@@ -46,12 +49,21 @@ export default function TimerButton({
       <button
         onClick={handleClick}
         disabled={isRunning || isCompleted}
-        className={`btn-primary text-lg sm:text-xl lg:text-2xl min-w-[240px] sm:min-w-[280px] w-full sm:w-auto relative overflow-hidden group ${
+        className={`btn-primary text-lg sm:text-xl lg:text-2xl min-w-[240px] sm:min-w-[280px] w-full sm:w-auto relative overflow-hidden group flex items-center justify-center gap-2 sm:gap-3 ${
           isCompleted ? '!bg-gradient-to-r !from-green-500 !to-emerald-600 glow' : ''
         }`}
       >
+        {showIcons && (
+          isCompleted ? (
+            <CheckIcon className="w-6 h-6 sm:w-7 sm:h-7" animate />
+          ) : isRunning ? (
+            <TimerIcon className="w-6 h-6 sm:w-7 sm:h-7 animate-spin" />
+          ) : (
+            <UnlockIcon className="w-6 h-6 sm:w-7 sm:h-7" />
+          )
+        )}
         <span className="relative z-10">
-          {isCompleted ? completedLabel : isRunning ? `⏱️ ${timeLeft}s` : label}
+          {isCompleted ? completedLabel : isRunning ? `${timeLeft}s` : label}
         </span>
         {!isCompleted && !isRunning && (
           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>

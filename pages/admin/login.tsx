@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
+import { AdminIcon, LockIcon } from '@/components/Icons';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -47,8 +48,9 @@ export default function AdminLogin() {
         <div className="card max-w-md w-full relative z-10 animate-fade-in">
           <div className="text-center mb-6 sm:mb-8">
             <div className="inline-block animate-float">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-4">
-                <span className="gradient-text">🔐 Admin</span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-4 flex items-center justify-center gap-2 sm:gap-3">
+                <LockIcon className="w-8 h-8 sm:w-10 sm:h-10" />
+                <span className="gradient-text">Admin</span>
               </h1>
             </div>
             <p className="text-purple-200 text-sm sm:text-base">Acceso restringido</p>

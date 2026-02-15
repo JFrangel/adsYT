@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { CheckIcon, AnnouncementIcon, LockIcon } from '@/components/Icons';
 import Head from 'next/head';
 
 export default function Entry2() {
@@ -62,15 +63,18 @@ export default function Entry2() {
         <div className="glass-card w-full max-w-lg p-6 sm:p-8 text-center space-y-6">
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-            <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">✓</span>
+            <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">
+              <CheckIcon className="w-4 h-4" />
+            </span>
             <span className="w-8 h-0.5 bg-yellow-400"></span>
             <span className="w-7 h-7 rounded-full bg-yellow-400 text-gray-900 flex items-center justify-center text-xs font-bold">2</span>
             <span className="w-8 h-0.5 bg-gray-600"></span>
             <span className="w-7 h-7 rounded-full bg-gray-600 text-gray-400 flex items-center justify-center text-xs font-bold">3</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
-            📢 Paso 2: Ver Anuncio
+          <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center gap-2">
+            <AnnouncementIcon className="w-7 h-7 sm:w-8 sm:h-8" />
+            Paso 2: Ver Anuncio
           </h1>
 
           <p className="text-gray-300 text-sm sm:text-base">
@@ -80,9 +84,12 @@ export default function Entry2() {
 
           {/* Status message */}
           {canContinue ? (
-            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 animate-fadeIn">
-              <p className="text-green-400 font-semibold text-lg">✅ ¡Anuncio completado!</p>
-              <p className="text-green-300 text-sm mt-1">Ya puedes continuar al siguiente paso.</p>
+            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 animate-fadeIn flex items-start gap-3">
+              <CheckIcon className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" animate />
+              <div className="text-left">
+                <p className="text-green-400 font-semibold text-lg">¡Anuncio completado!</p>
+                <p className="text-green-300 text-sm mt-1">Ya puedes continuar al siguiente paso.</p>
+              </div>
             </div>
           ) : (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
@@ -100,9 +107,10 @@ export default function Entry2() {
                 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700
                 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40
                 transform hover:scale-[1.02] active:scale-95
-                transition-all duration-300"
+                transition-all duration-300 flex items-center justify-center gap-2"
             >
-              👁️ Ver Anuncio
+              <AnnouncementIcon className="w-5 h-5" animate />
+              Ver Anuncio
             </button>
           )}
 
@@ -110,13 +118,23 @@ export default function Entry2() {
           <button
             onClick={handleContinue}
             disabled={!canContinue}
-            className={`w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300
+            className={`w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 flex items-center justify-center gap-2
               ${canContinue
                 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-[1.02] active:scale-95 cursor-pointer'
                 : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
               }`}
           >
-            {canContinue ? 'Continuar a Paso 3 →' : '🔒 Completa el anuncio para continuar'}
+            {canContinue ? (
+              <>
+                Continuar a Paso 3
+                <span>→</span>
+              </>
+            ) : (
+              <>
+                <LockIcon className="w-5 h-5" />
+                Completa el anuncio para continuar
+              </>
+            )}
           </button>
 
           {/* Back link */}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
+import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, LoadingSpinner } from '@/components/Icons';
 
 interface FileItem {
   id: string;
@@ -128,19 +129,24 @@ export default function AdminPanel() {
           {/* Header */}
           <div className="card mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
             <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2">
-                <span className="gradient-text">🛠️ Panel Admin</span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2 flex items-center gap-2">
+                <AdminIcon className="w-8 h-8 sm:w-10 sm:h-10 text-purple-400" animate />
+                <span className="gradient-text">Panel Admin</span>
               </h1>
               <p className="text-purple-200 text-base sm:text-lg">Gestión de archivos y contenido</p>
             </div>
-            <button onClick={handleLogout} className="btn-secondary w-full sm:w-auto text-base sm:text-lg">
-              🚪 Cerrar Sesión
+            <button onClick={handleLogout} className="btn-secondary w-full sm:w-auto text-base sm:text-lg flex items-center justify-center gap-2">
+              <LogoutIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+              Cerrar Sesión
             </button>
           </div>
 
           {/* Upload Form */}
           <div className="card mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text">📤 Subir Nuevo Archivo</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
+              <UploadIcon className="w-7 h-7 sm:w-8 sm:h-8" />
+              Subir Nuevo Archivo
+            </h2>
             <form onSubmit={handleUpload} className="space-y-4 sm:space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
@@ -178,16 +184,20 @@ export default function AdminPanel() {
               <button
                 type="submit"
                 disabled={uploading}
-                className="btn-primary text-base sm:text-lg w-full sm:w-auto"
+                className="btn-primary text-base sm:text-lg w-full sm:w-auto flex items-center justify-center gap-2"
               >
-                {uploading ? '⏳ Subiendo...' : '📤 Subir Archivo'}
+                <UploadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                {uploading ? 'Subiendo...' : 'Subir Archivo'}
               </button>
             </form>
           </div>
 
           {/* Files List */}
           <div className="card animate-fade-in" style={{animationDelay: '0.4s'}}>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text">📁 Archivos Actuales</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
+              <FolderIcon className="w-7 h-7 sm:w-8 sm:h-8" />
+              Archivos Actuales
+            </h2>
             
             {loading ? (
               <div className="text-center py-12 sm:py-16">
@@ -210,18 +220,22 @@ export default function AdminPanel() {
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex-1">
-                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2">📦 {file.name}</h3>
+                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2 flex items-center gap-2">
+                          <FileIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          {file.name}
+                        </h3>
                         <p className="text-xs sm:text-sm text-purple-300">
-                          {file.filename} • {(file.size / (1024 * 1024)).toFixed(2)} MB • ⬇️ {file.downloads} descargas
+                          {file.filename} • {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.downloads} descargas
                         </p>
                       </div>
                       <button
                         onClick={() => handleDelete(file.id, file.filename)}
                         className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-xl 
                                   hover:from-red-600 hover:to-pink-700 transition-all duration-300
-                                  shadow-xl hover:shadow-2xl hover:scale-105 transform text-sm sm:text-base"
+                                  shadow-xl hover:shadow-2xl hover:scale-105 transform text-sm sm:text-base flex items-center justify-center gap-2"
                       >
-                        🗑️ Eliminar
+                        <DeleteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        Eliminar
                       </button>
                     </div>
                   </div>
