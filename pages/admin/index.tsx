@@ -336,11 +336,7 @@ export default function AdminPanel() {
     const formData = new FormData(e.currentTarget);
 
     try {
-      await axios.post('/api/admin/files', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      await axios.post('/api/admin/files', formData);
 
       showAlert('Archivo Subido', 'Archivo subido correctamente', 'success');
       fetchFiles();
