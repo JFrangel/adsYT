@@ -249,6 +249,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Get current SHA from main branch to ensure we have the right version to delete
       console.log('🔍 Getting current file SHA from main branch...');
+      let fileExists = true;
       let currentSha = fileItem.sha;
       try {
         const currentFileInfo = await github.getFile(`files/${fileItem.filename}`);
@@ -256,20 +257,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           currentSha = currentFileInfo.sha;
           console.log('✅ Current SHA found:', currentSha);
         }
-      } catch (shaError) {
-        console.warn('⚠️ Could not get current SHA, using manifest SHA:', fileItem.sha);
+      } catch (shaError: any) {
+        if (shaError.response?.status === 404) {
+          console.warn('⚠️ File already deleted from GitHub, will just update manifest');
+          fileExists = false;
+        } else {
+          console.warn('⚠️ Error getting SHA:', shaError.message);
+          // Use the SHA from manifest anyway
+        }
       }
 
-      // Delete from GitHub with skip build flags
-      console.log('🗑️ Deleting file with SHA:', currentSha);
-      await github.deleteFile(
-        `files/${fileItem.filename}`,
-        currentSha,
-        `[DATA] Delete ${fileItem.filename} [skip ci][skip netlify]`
-      );
-      console.log('✅ File deleted successfully');
+      // Delete from GitHub only if it still exists
+      if (fileExists) {
+        console.log('🗑️ Deleting file with SHA:', currentSha);
+        try {
+          await github.deleteFile(
+            `files/${fileItem.filename}`,
+            currentSha,
+            `[DATA] Delete ${fileItem.filename} [skip ci][skip netlify]`
+          );
+          console.log('✅ File deleted successfully');
+        } catch (deleteError: any) {
+          if (deleteError.response?.status === 404) {
+            console.warn('⚠️ File not found (already deleted), continuing with manifest update');
+          } else {
+            throw deleteError; // Re-throw other errors
+          }
+        }
+      } else {
+        console.log('ℹ️ File already deleted, skipping GitHub deletion');
+      }
 
-      // Update manifest in DATA branch to avoid builds
+      // Update manifest in DATA branch to avoid builds (always do this)
+      console.log('📝 Updating manifest to remove file...');
       manifest.files = manifest.files.filter((f: any) => f.id !== file);
       
       await githubData.createOrUpdateFile(
@@ -278,6 +298,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `[DATA] Remove ${fileItem.filename} from manifest [skip ci][skip netlify]`,
         manifestFile.sha
       );
+      console.log('✅ Manifest updated successfully');
 
       return res.status(200).json({ success: true });
     } catch (error: any) {
