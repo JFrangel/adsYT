@@ -42,19 +42,154 @@ async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fiel
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Require admin authentication
-    requireAdmin(req);
-  } catch (error: any) {
-    return res.status(401).json({ error: error.message });
-  }
+    console.log('🔵 Request started:', { method: req.method, url: req.url });
+    
+    // POST requires auth + form parsing
+    // GET/DELETE require auth
+    if (req.method === 'POST') {
+      console.log('📤 POST request detected, parsing form...');
+      // Parse form first, then authenticate
+      try {
+        const { fields, files } = await parseForm(req);
+        console.log('✅ Form parsed successfully');
+        
+        // Now authenticate after form is parsed
+        try {
+          requireAdmin(req);
+        } catch (authError: any) {
+          return res.status(401).json({ error: authError.message });
+        }
 
-  const github = createGitHubService(); // Para leer/escribir en main
-  const githubData = createGitHubDataService(); // Para leer stats desde data
+        const file = Array.isArray(files.file) ? files.file[0] : files.file;
+        const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
+
+        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
+
+        if (!file || !name) {
+          console.error('❌ Missing file or name:', { file: !!file, name });
+          return res.status(400).json({ error: 'File and name required' });
+        }
+
+        // Check file size (50MB limit)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+          console.error('❌ File too large:', file.size);
+          return res.status(400).json({ error: 'File too large (max 50MB)' });
+        }
+
+        // Read file
+        console.log('📖 Reading file from:', file.filepath);
+        const fileBuffer = fs.readFileSync(file.filepath);
+        let filename = file.originalFilename || 'unnamed';
+        
+        // Sanitize filename to avoid GitHub API issues
+        filename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
+        console.log('✅ File read successfully, size:', fileBuffer.length, 'filename:', filename);
+
+        // Clean up temp file immediately after reading
+        try {
+          fs.unlinkSync(file.filepath);
+          console.log('🧹 Temp file cleaned up');
+        } catch (cleanupError) {
+          console.warn('⚠️ Could not cleanup temp file:', cleanupError);
+        }
+
+        const github = createGitHubService();
+        const githubData = createGitHubDataService();
+
+        // Upload to GitHub main branch
+        console.log('🔧 Uploading to GitHub:', `files/${filename}`);
+        const result = await github.uploadFile(
+          `files/${filename}`,
+          fileBuffer,
+          `[DATA] Upload ${filename} [skip ci][skip netlify]`
+        );
+        console.log('✅ GitHub upload successful, SHA:', result.content?.sha);
+
+        // Update manifest in DATA branch to avoid builds
+        console.log('📝 Updating manifest in data branch to avoid builds...');
+        const manifestFile = await githubData.getFile('manifest.json');
+        let manifest: any = { files: [] };
+        
+        if (manifestFile) {
+          const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
+          manifest = JSON.parse(content);
+        }
+
+        const newFile = {
+          id: Math.random().toString(36).substring(2, 15),
+          name,
+          filename,
+          size: file.size,
+          sha: result.content.sha,
+          uploadedAt: new Date().toISOString(),
+          visible: true,
+        };
+
+        manifest.files = manifest.files || [];
+        manifest.files.push(newFile);
+
+        // Update manifest in DATA branch to avoid builds
+        await githubData.createOrUpdateFile(
+          'manifest.json',
+          JSON.stringify(manifest, null, 2),
+          `[DATA] Add ${filename} to manifest [skip ci][skip netlify]`,
+          manifestFile?.sha
+        );
+
+        // Initialize download stats in data branch to avoid Netlify builds
+        try {
+          console.log('📊 Initializing download stats in data branch to avoid builds...');
+          
+          let downloadStats: any = {};
+          const downloadsFile = await githubData.getFile('downloads-stats.json');
+          if (downloadsFile) {
+            const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
+            downloadStats = JSON.parse(statsContent);
+          }
+          
+          // Initialize download count for new file
+          downloadStats[newFile.id] = 0;
+          
+          await githubData.createOrUpdateFile(
+            'downloads-stats.json',
+            JSON.stringify(downloadStats, null, 2),
+            `[DATA] Initialize download stats for ${filename} [skip ci][skip netlify]`,
+            downloadsFile?.sha
+          );
+          
+          console.log('✅ Download stats initialized in data branch');
+        } catch (statsError) {
+          console.warn('⚠️ Could not initialize download stats in data branch:', statsError);
+        }
+
+        return res.status(200).json({ 
+          success: true, 
+          file: { ...newFile, downloads: 0 }
+        });
+      } catch (parseError: any) {
+        console.error('❌ Form parse error:', {
+          message: parseError.message,
+          code: parseError.code,
+          stack: parseError.stack,
+        });
+        return res.status(400).json({ error: 'Failed to parse form: ' + parseError.message });
+      }
+    }
+
+    // For GET and DELETE, authenticate first
+    try {
+      requireAdmin(req);
+    } catch (error: any) {
+      return res.status(401).json({ error: error.message });
+    }
+
+    const github = createGitHubService();
+    const githubData = createGitHubDataService();
 
   // GET - List files
   if (req.method === 'GET') {
     try {
-      // Get manifest from DATA branch to avoid builds
       console.log('📋 Getting manifest from data branch for admin panel...');
       const manifestFile = await githubData.getFile('manifest.json');
       
@@ -85,139 +220,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json({ files: filesWithStats });
     } catch (error: any) {
-      console.error('Error fetching files:', error);
+      console.error('❌ Get files error:', {
+        message: error.message,
+        status: error.response?.status,
+        stack: error.stack,
+      });
       
       if (error.response?.status === 404) {
         return res.status(200).json({ files: [] });
       }
       
-      return res.status(500).json({ error: 'Error fetching files' });
-    }
-  }
-
-  // POST - Upload file
-  if (req.method === 'POST') {
-    try {
-      console.log('📤 Starting file upload...');
-      
-      const { fields, files } = await parseForm(req);
-      console.log('📋 Parsed form:', { fields: Object.keys(fields), files: Object.keys(files) });
-      
-      const file = Array.isArray(files.file) ? files.file[0] : files.file;
-      const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
-
-      console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
-
-      if (!file || !name) {
-        console.error('❌ Missing file or name:', { file: !!file, name });
-        return res.status(400).json({ error: 'File and name required' });
-      }
-
-      // Check file size (50MB limit)
-      const maxSize = 50 * 1024 * 1024;
-      if (file.size > maxSize) {
-        console.error('❌ File too large:', file.size);
-        return res.status(400).json({ error: 'File too large (max 50MB)' });
-      }
-
-      // Read file
-      console.log('📖 Reading file from:', file.filepath);
-      const fileBuffer = fs.readFileSync(file.filepath);
-      let filename = file.originalFilename || 'unnamed';
-      
-      // Sanitize filename to avoid GitHub API issues
-      filename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
-      console.log('✅ File read successfully, size:', fileBuffer.length, 'filename:', filename);
-
-      // Clean up temp file immediately after reading
-      try {
-        fs.unlinkSync(file.filepath);
-        console.log('🧹 Temp file cleaned up');
-      } catch (cleanupError) {
-        console.warn('⚠️ Could not cleanup temp file:', cleanupError);
-      }
-
-      // Upload to GitHub main branch
-      console.log('🔧 Uploading to GitHub:', `files/${filename}`);
-      const result = await github.uploadFile(
-        `files/${filename}`,
-        fileBuffer,
-        `[DATA] Upload ${filename} [skip ci][skip netlify]`
-      );
-      console.log('✅ GitHub upload successful, SHA:', result.content?.sha);
-
-      // Update manifest in DATA branch to avoid builds
-      console.log('📝 Updating manifest in data branch to avoid builds...');
-      const manifestFile = await githubData.getFile('manifest.json');
-      let manifest: any = { files: [] };
-      
-      if (manifestFile) {
-        const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
-        manifest = JSON.parse(content);
-      }
-
-      const newFile = {
-        id: Math.random().toString(36).substring(2, 15),
-        name,
-        filename,
-        size: file.size,
-        sha: result.content.sha,
-        uploadedAt: new Date().toISOString(),
-        visible: true,
-        // downloads removed - now tracked in data branch
-      };
-
-      manifest.files = manifest.files || [];
-      manifest.files.push(newFile);
-
-      // Update manifest in DATA branch to avoid builds
-      await githubData.createOrUpdateFile(
-        'manifest.json',
-        JSON.stringify(manifest, null, 2),
-        `[DATA] Add ${filename} to manifest [skip ci][skip netlify]`,
-        manifestFile?.sha
-      );
-
-      // Initialize download stats in data branch to avoid Netlify builds
-      try {
-        console.log('📊 Initializing download stats in data branch to avoid builds...');
-        
-        let downloadStats: any = {};
-        const downloadsFile = await githubData.getFile('downloads-stats.json');
-        if (downloadsFile) {
-          const statsContent = Buffer.from(downloadsFile.content, 'base64').toString('utf-8');
-          downloadStats = JSON.parse(statsContent);
-        }
-        
-        // Initialize download count for new file
-        downloadStats[newFile.id] = 0;
-        
-        await githubData.createOrUpdateFile(
-          'downloads-stats.json',
-          JSON.stringify(downloadStats, null, 2),
-          `[DATA] Initialize download stats for ${filename} [skip ci][skip netlify]`,
-          downloadsFile?.sha
-        );
-        
-        console.log('✅ Download stats initialized in data branch');
-      } catch (statsError) {
-        console.warn('⚠️ Could not initialize download stats in data branch:', statsError);
-        // Not critical - stats will be created on first download
-      }
-
-      return res.status(200).json({ 
-        success: true, 
-        file: { ...newFile, downloads: 0 } // Add downloads for response
-      });
-    } catch (error: any) {
-      console.error('❌ Upload error:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        stack: error.stack,
-      });
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Unknown error';
-      return res.status(500).json({ error: 'Upload failed: ' + errorMsg });
+      return res.status(500).json({ error: 'Error fetching files: ' + error.message });
     }
   }
 
