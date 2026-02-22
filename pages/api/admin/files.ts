@@ -78,30 +78,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // POST - Upload file
   if (req.method === 'POST') {
     try {
+      console.log('📤 Starting file upload...');
+      
       const { fields, files } = await parseForm(req);
+      console.log('📋 Parsed form:', { fields: Object.keys(fields), files: Object.keys(files) });
+      
       const file = Array.isArray(files.file) ? files.file[0] : files.file;
       const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
 
+      console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
+
       if (!file || !name) {
+        console.error('❌ Missing file or name:', { file: !!file, name });
         return res.status(400).json({ error: 'File and name required' });
       }
 
       // Check file size (50MB limit)
       const maxSize = 50 * 1024 * 1024;
       if (file.size > maxSize) {
+        console.error('❌ File too large:', file.size);
         return res.status(400).json({ error: 'File too large (max 50MB)' });
       }
 
       // Read file
+      console.log('📖 Reading file from:', file.filepath);
       const fileBuffer = fs.readFileSync(file.filepath);
-      const filename = file.originalFilename || 'unnamed';
+      let filename = file.originalFilename || 'unnamed';
+      
+      // Sanitize filename to avoid GitHub API issues
+      filename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
+      console.log('✅ File read successfully, size:', fileBuffer.length, 'filename:', filename);
 
       // Upload to GitHub main branch
+      console.log('🔧 Uploading to GitHub:', `files/${filename}`);
       const result = await github.uploadFile(
         `files/${filename}`,
         fileBuffer,
         `[DATA] Upload ${filename} [skip ci][skip netlify]`
       );
+      console.log('✅ GitHub upload successful, SHA:', result.content?.sha);
 
       // Update manifest in DATA branch to avoid builds
       console.log('📝 Updating manifest in data branch to avoid builds...');
@@ -167,8 +182,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         file: { ...newFile, downloads: 0 } // Add downloads for response
       });
     } catch (error: any) {
-      console.error('Upload error:', error);
-      return res.status(500).json({ error: 'Upload failed: ' + error.message });
+      console.error('❌ Upload error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack,
+      });
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Unknown error';
+      return res.status(500).json({ error: 'Upload failed: ' + errorMsg });
     }
   }
 
