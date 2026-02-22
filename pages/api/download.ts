@@ -15,15 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     console.log('🔵 Download request started:', { fileId });
     
-    const github = createGitHubService(); // Para leer archivos desde main
-    const githubData = createGitHubDataService(); // Para guardar stats en rama data
+    const github = createGitHubService();
+    const githubData = createGitHubDataService();
     
-    // Get manifest from main branch to find file details
-    console.log('📋 Fetching manifest.json...');
-    const manifestFile = await github.getFile('manifest.json');
+    // Get manifest from DATA branch (where files are stored)
+    console.log('📋 Fetching manifest.json from DATA branch...');
+    const manifestFile = await githubData.getFile('manifest.json');
     
     if (!manifestFile) {
-      console.error('❌ Manifest not found');
+      console.error('❌ Manifest not found in DATA branch');
       return res.status(404).json({ error: 'No files available' });
     }
 
@@ -90,15 +90,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Download file from GitHub (works on both local and serverless)
+    // Download file from GitHub DATA branch (works on both local and serverless)
     try {
-      console.log('📥 Downloading file from GitHub:', fileItem.filename);
+      console.log('📥 Downloading file from GitHub DATA branch:', fileItem.filename);
       
-      // Get raw file URL from GitHub
-      const fileContent = await github.getFile(`files/${fileItem.filename}`);
+      // Get file from DATA branch
+      const fileContent = await githubData.getFile(`files/${fileItem.filename}`);
       
       if (!fileContent) {
-        console.error('File not found in GitHub:', fileItem.filename);
+        console.error('File not found in DATA branch:', fileItem.filename);
         return res.status(404).json({ error: 'File not available for download' });
       }
 
@@ -120,7 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       
       if (downloadError.response?.status === 404) {
-        return res.status(404).json({ error: 'File not found in repository' });
+        return res.status(404).json({ error: 'File not found in DATA branch' });
       }
       
       return res.status(500).json({ error: 'Failed to download file: ' + downloadError.message });

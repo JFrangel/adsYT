@@ -97,14 +97,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const github = createGitHubService();
         const githubData = createGitHubDataService();
 
-        // Upload to GitHub main branch
-        console.log('🔧 Uploading to GitHub:', `files/${filename}`);
-        const result = await github.uploadFile(
+        // Upload to GitHub DATA branch (not main) to avoid builds
+        console.log('🔧 Uploading to GitHub DATA branch:', `files/${filename}`);
+        const result = await githubData.uploadFile(
           `files/${filename}`,
           fileBuffer,
           `[DATA] Upload ${filename} [skip ci][skip netlify]`
         );
-        console.log('✅ GitHub upload successful, SHA:', result.content?.sha);
+        console.log('✅ GitHub upload successful to DATA branch, SHA:', result.content?.sha);
 
         // Update manifest in DATA branch to avoid builds
         console.log('📝 Updating manifest in data branch to avoid builds...');
