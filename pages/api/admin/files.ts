@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/auth';
 import { createGitHubService, createGitHubDataService } from '@/lib/github';
 import formidable from 'formidable';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 export const config = {
   api: {
@@ -11,11 +13,29 @@ export const config = {
 };
 
 async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> {
-  const form = formidable({ multiples: false });
+  // Use system temp directory, works on both local and Netlify
+  const uploadDir = path.join(os.tmpdir(), 'uploads');
+  
+  // Create upload directory if it doesn't exist
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  
+  const form = formidable({ 
+    multiples: false,
+    uploadDir: uploadDir,
+    keepExtensions: true,
+  });
+  
   return new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
-      if (err) reject(err);
-      else resolve({ fields, files });
+      if (err) {
+        console.error('❌ Form parse error:', err);
+        reject(err);
+      } else {
+        console.log('✅ Form parsed successfully');
+        resolve({ fields, files });
+      }
     });
   });
 }
@@ -108,6 +128,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Sanitize filename to avoid GitHub API issues
       filename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
       console.log('✅ File read successfully, size:', fileBuffer.length, 'filename:', filename);
+
+      // Clean up temp file immediately after reading
+      try {
+        fs.unlinkSync(file.filepath);
+        console.log('🧹 Temp file cleaned up');
+      } catch (cleanupError) {
+        console.warn('⚠️ Could not cleanup temp file:', cleanupError);
+      }
 
       // Upload to GitHub main branch
       console.log('🔧 Uploading to GitHub:', `files/${filename}`);
@@ -219,12 +247,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'File not found' });
       }
 
+      // Get current SHA from main branch to ensure we have the right version to delete
+      console.log('🔍 Getting current file SHA from main branch...');
+      let currentSha = fileItem.sha;
+      try {
+        const currentFileInfo = await github.getFile(`files/${fileItem.filename}`);
+        if (currentFileInfo?.sha) {
+          currentSha = currentFileInfo.sha;
+          console.log('✅ Current SHA found:', currentSha);
+        }
+      } catch (shaError) {
+        console.warn('⚠️ Could not get current SHA, using manifest SHA:', fileItem.sha);
+      }
+
       // Delete from GitHub with skip build flags
+      console.log('🗑️ Deleting file with SHA:', currentSha);
       await github.deleteFile(
         `files/${fileItem.filename}`,
-        fileItem.sha,
+        currentSha,
         `[DATA] Delete ${fileItem.filename} [skip ci][skip netlify]`
       );
+      console.log('✅ File deleted successfully');
 
       // Update manifest in DATA branch to avoid builds
       manifest.files = manifest.files.filter((f: any) => f.id !== file);
@@ -238,8 +281,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json({ success: true });
     } catch (error: any) {
-      console.error('Delete error:', error);
-      return res.status(500).json({ error: 'Delete failed: ' + error.message });
+      console.error('❌ Delete error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack,
+      });
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || 'Unknown error';
+      return res.status(500).json({ error: 'Delete failed: ' + errorMsg });
     }
   }
 
