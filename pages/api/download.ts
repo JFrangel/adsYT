@@ -1,7 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createGitHubService, createGitHubDataService } from '@/lib/github';
-import fs from 'fs';
-import path from 'path';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { file } = req.query;
@@ -10,32 +8,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const fileId = Array.isArray(file) ? file[0] : file;
 
   if (!fileId) {
+    console.error('❌ No file ID provided');
     return res.status(400).json({ error: 'File ID required' });
   }
 
   try {
+    console.log('🔵 Download request started:', { fileId });
+    
     const github = createGitHubService(); // Para leer archivos desde main
     const githubData = createGitHubDataService(); // Para guardar stats en rama data
     
     // Get manifest from main branch to find file details
+    console.log('📋 Fetching manifest.json...');
     const manifestFile = await github.getFile('manifest.json');
     
     if (!manifestFile) {
+      console.error('❌ Manifest not found');
       return res.status(404).json({ error: 'No files available' });
     }
 
     const content = Buffer.from(manifestFile.content, 'base64').toString('utf-8');
     const manifest = JSON.parse(content);
     
+    console.log('📂 Manifest loaded, total files:', manifest.files?.length || 0);
+    console.log('🔍 Looking for file ID:', fileId);
+    
     const fileItem = manifest.files?.find((f: any) => f.id === fileId);
     
     if (!fileItem) {
+      console.error('❌ File not found in manifest. Available IDs:', manifest.files?.map((f: any) => f.id) || []);
       return res.status(404).json({ error: 'File not found' });
     }
 
+    console.log('✅ File found in manifest:', { filename: fileItem.filename, id: fileId });
+
     // Increment download count if POST request
     if (req.method === 'POST') {
-      console.log('💾 Updating download stats in data branch to avoid Netlify builds...');
+      console.log('💾 POST request: Updating download stats in data branch...');
       
       try {
         // Get download stats from data branch
@@ -81,49 +90,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // GET request - download file from local storage
+    // Download file from GitHub (works on both local and serverless)
     try {
-      // Build path to files directory
-      const filesDir = path.join(process.cwd(), 'files');
-      const filePath = path.join(filesDir, fileItem.filename);
+      console.log('📥 Downloading file from GitHub:', fileItem.filename);
       
-      // Security: ensure file path is within files directory
-      const normalizedPath = path.normalize(filePath);
-      if (!normalizedPath.startsWith(filesDir)) {
-        console.error('Security violation: attempted to access file outside files directory');
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      // Check if file exists
-      if (!fs.existsSync(filePath)) {
-        console.error('File not found on disk:', fileItem.filename);
+      // Get raw file URL from GitHub
+      const fileContent = await github.getFile(`files/${fileItem.filename}`);
+      
+      if (!fileContent) {
+        console.error('File not found in GitHub:', fileItem.filename);
         return res.status(404).json({ error: 'File not available for download' });
       }
 
-      // Get file info
-      const stats = fs.statSync(filePath);
+      // Decode base64 content from GitHub
+      const fileBuffer = Buffer.from(fileContent.content, 'base64');
       
-      // Set headers
+      // Set headers for download
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
-      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Content-Length', fileBuffer.length);
 
-      // Stream file to response
-      const stream = fs.createReadStream(filePath);
-      stream.pipe(res);
-      
-      stream.on('error', (err) => {
-        console.error('Stream error:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Error reading file' });
-        }
-      });
+      // Send file to client
+      res.end(fileBuffer);
     } catch (downloadError: any) {
-      console.error('Download error:', {
+      console.error('❌ Download error:', {
         filename: fileItem.filename,
         message: downloadError.message,
+        status: downloadError.response?.status,
       });
-      return res.status(500).json({ error: 'Failed to download file' });
+      
+      if (downloadError.response?.status === 404) {
+        return res.status(404).json({ error: 'File not found in repository' });
+      }
+      
+      return res.status(500).json({ error: 'Failed to download file: ' + downloadError.message });
     }
   } catch (error: any) {
     console.error('Download error:', {
