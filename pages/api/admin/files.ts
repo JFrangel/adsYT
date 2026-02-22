@@ -327,4 +327,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+  } catch (error: any) {
+    console.error('❌ Unhandled handler error:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ error: 'Internal server error: ' + error.message });
+  }
 }
