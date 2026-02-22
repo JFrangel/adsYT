@@ -25,6 +25,8 @@ async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fiel
     multiples: false,
     uploadDir: uploadDir,
     keepExtensions: true,
+    allowEmptyFiles: true, // Allow parsing to proceed (we'll validate size ourselves)
+    minFileSize: 0, // We'll validate size manually
   });
   
   return new Promise((resolve, reject) => {
@@ -63,11 +65,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const file = Array.isArray(files.file) ? files.file[0] : files.file;
         const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
 
-        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
+        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename, size: file?.size });
 
         if (!file || !name) {
           console.error('❌ Missing file or name:', { file: !!file, name });
           return res.status(400).json({ error: 'File and name required' });
+        }
+
+        // Check file size (must be > 0)
+        if (!file.size || file.size === 0) {
+          console.error('❌ File is empty:', file.size);
+          return res.status(400).json({ error: 'File cannot be empty' });
         }
 
         // Check file size (50MB limit)
@@ -80,6 +88,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Read file
         console.log('📖 Reading file from:', file.filepath);
         const fileBuffer = fs.readFileSync(file.filepath);
+        
+        // Verify file was read correctly
+        if (!fileBuffer || fileBuffer.length === 0) {
+          console.error('❌ Failed to read file or file is empty');
+          return res.status(400).json({ error: 'Failed to read file - file may be corrupted' });
+        }
+        
         let filename = file.originalFilename || 'unnamed';
         
         // Sanitize filename to avoid GitHub API issues
