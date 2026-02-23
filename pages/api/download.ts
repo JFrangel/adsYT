@@ -151,10 +151,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
         const axios = (await import('axios')).default;
-        const streamResp = await axios.get(downloadUrl, {
-          responseType: 'stream',
-          headers: githubData ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN || ''}` } : undefined,
-        });
+
+        // Do a HEAD request first to validate content-type and status
+        let headResp;
+        try {
+          headResp = await axios.head(downloadUrl);
+          console.log('🔎 HEAD response headers:', headResp.status, headResp.headers['content-type']);
+        } catch (headErr: any) {
+          console.warn('⚠️ HEAD request failed, continuing to GET stream (may still work):', headErr?.message || headErr);
+          headResp = undefined;
+        }
+
+        const contentTypeHint = headResp?.headers?.['content-type'] || '';
+        const statusHint = headResp?.status;
+
+        if (statusHint && statusHint !== 200) {
+          // Try to fetch body as text to return a useful error
+          try {
+            const errResp = await axios.get(downloadUrl, { responseType: 'text' });
+            console.error('❌ Download endpoint returned non-200:', statusHint, errResp.data?.substring?.(0,200));
+            return res.status(502).json({ error: 'Failed to download file from upstream', details: errResp.data?.substring?.(0,500) });
+          } catch (errFetch: any) {
+            console.error('❌ Failed to fetch error body:', errFetch?.message || errFetch);
+            return res.status(502).json({ error: 'Failed to download file from upstream' });
+          }
+        }
+
+        // If HEAD indicates JSON or HTML, fetch as text and return error
+        if (contentTypeHint.includes('application/json') || contentTypeHint.includes('text/html')) {
+          try {
+            const textResp = await axios.get(downloadUrl, { responseType: 'text' });
+            console.warn('⚠️ Upstream returned JSON/HTML instead of file:', contentTypeHint);
+            // Try to parse JSON for useful message
+            try {
+              const parsed = JSON.parse(textResp.data);
+              return res.status(502).json({ error: 'Upstream error', details: parsed });
+            } catch (parseErr) {
+              return res.status(502).json({ error: 'Upstream error', details: textResp.data?.substring?.(0,1000) });
+            }
+          } catch (fetchErr: any) {
+            console.error('❌ Error fetching upstream text body:', fetchErr?.message || fetchErr);
+            return res.status(502).json({ error: 'Upstream returned non-file content' });
+          }
+        }
+
+        // Safe to stream binary
+        const streamResp = await axios.get(downloadUrl, { responseType: 'stream' });
 
         // Proxy headers
         const contentLength = streamResp.headers['content-length'];
