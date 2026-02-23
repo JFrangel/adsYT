@@ -301,7 +301,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Combine manifest data with download stats for admin view
       const filesWithStats = manifest.files?.map((file: any) => ({
         ...file,
-        downloads: downloadStats[file.id] || file.downloads || 0
+        downloads: downloadStats[file.id] || file.downloads || 0,
+        downloadUrl: githubData.getRawUrl(`files/${file.filename}`), // Direct GitHub raw URL
       })) || [];
 
       return res.status(200).json({ files: filesWithStats });

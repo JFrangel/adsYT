@@ -57,39 +57,30 @@ export default function Entry3() {
     try {
       console.log('🎯 Download started for:', file.name);
       
-      // Abrir ventana del anuncio INMEDIATAMENTE
+      // Abrir ventana del anuncio
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // MÉTODO MÁS SIMPLE: descarga directa con <a> tag
-      console.log('📥 Creating download link...');
-      const downloadUrl = `/api/download?file=${file.id}`;
+      // Descargar directamente desde GitHub (mucho más simple y confiable)
+      console.log('📥 Downloading from GitHub:', file.downloadUrl);
       
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = file.downloadUrl;
       link.download = file.filename || 'archivo';
       link.style.display = 'none';
       
-      // Agregar al DOM
       document.body.appendChild(link);
-      
-      // Click
-      console.log('🔨 Triggering download...');
       link.click();
+      document.body.removeChild(link);
       
-      // Limpiar
-      setTimeout(() => {
-        document.body.removeChild(link);
-      }, 100);
+      console.log('✅ Download initiated from GitHub');
       
-      console.log('✅ Download link clicked');
-      
-      // PASO 2: Registrar descarga (no bloqueante)
+      // Registrar descarga (no bloqueante)
       console.log('📊 Registering download...');
       axios.post(`/api/download?file=${file.id}`)
         .then(() => console.log('✅ Download registered'))
-        .catch(err => console.warn('⚠️ Could not register:', err.message));
+        .catch(err => console.warn('⚠️ Registration failed:', err.message));
       
-      // PASO 3: Abrir anuncio
+      // Abrir anuncio
       try {
         console.log('🔄 Getting ad link...');
         const adResponse = await axios.get('/api/get-redirect-link');
@@ -98,7 +89,6 @@ export default function Entry3() {
         setTimeout(() => {
           if (adWindow && !adWindow.closed) {
             adWindow.location.href = adUrl;
-            console.log('🚀 Ad opened');
           } else {
             window.open(adUrl, '_blank');
           }
@@ -111,7 +101,7 @@ export default function Entry3() {
       }
       
     } catch (error: any) {
-      console.error('❌ Download error:', error);
+      console.error('❌ Error:', error);
       showAlert(
         'Error en la Descarga',
         'No se pudo descargar el archivo. Intenta nuevamente.',

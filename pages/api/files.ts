@@ -37,7 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Combine manifest data with download stats
     const filesWithStats = manifest.files?.map((file: any) => ({
       ...file,
-      downloads: downloadStats[file.id] || file.downloads || 0 // Use data branch stats, fallback to manifest, then 0
+      downloads: downloadStats[file.id] || file.downloads || 0, // Use data branch stats, fallback to manifest, then 0
+      downloadUrl: githubData.getRawUrl(`files/${file.filename}`), // Direct GitHub raw URL for downloads
     })) || [];
 
     // Filter visible files only
