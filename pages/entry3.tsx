@@ -14,6 +14,7 @@ interface FileItem {
   size: number;
   uploadedAt: string;
   downloads: number;
+  downloadUrl?: string;
 }
 
 export default function Entry3() {
@@ -60,25 +61,34 @@ export default function Entry3() {
       // Abrir ventana del anuncio
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // Descargar directamente desde GitHub (mucho más simple y confiable)
-      console.log('📥 Downloading from GitHub:', file.downloadUrl);
-      
-      const link = document.createElement('a');
-      link.href = file.downloadUrl;
-      link.download = file.filename || 'archivo';
-      link.style.display = 'none';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log('✅ Download initiated from GitHub');
-      
-      // Registrar descarga (no bloqueante)
-      console.log('📊 Registering download...');
-      axios.post(`/api/download?file=${file.id}`)
-        .then(() => console.log('✅ Download registered'))
-        .catch(err => console.warn('⚠️ Registration failed:', err.message));
+      // Registrar descarga en el servidor (POST) y luego iniciar la descarga
+      // desde el endpoint servidor (GET /api/download?file=...) para asegurar
+      // que se sirve el binario correcto independientemente de la extensión.
+      console.log('📊 Registering download on server...');
+      try {
+        await axios.post(`/api/download?file=${file.id}`);
+        console.log('✅ Download registered on server');
+      } catch (err: any) {
+        console.warn('⚠️ Registration failed:', err?.message || err);
+        // Proceder con la descarga aunque falle el registro
+      }
+
+      // Iniciar descarga desde el endpoint servidor (envía Content-Disposition)
+      try {
+        const downloadUrl = `/api/download?file=${file.id}`;
+        console.log('📥 Initiating download from server:', downloadUrl);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = file.filename || 'archivo';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('✅ Download initiated from server endpoint');
+      } catch (downloadErr: any) {
+        console.error('❌ Error initiating server download:', downloadErr?.message || downloadErr);
+        throw downloadErr;
+      }
       
       // Abrir anuncio
       try {

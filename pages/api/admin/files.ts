@@ -134,8 +134,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
         
-        let filename = file.originalFilename || 'unnamed';
-        
+        const originalFilename = file.originalFilename || 'unnamed';
+
+        // Determine extension: prefer original filename, fallback to temp filepath, then try mimetype map
+        let ext = path.extname(originalFilename);
+        if (!ext) {
+          ext = path.extname(file.filepath) || '';
+        }
+
+        const mimeType = (file as any).mimetype || (file as any).type || '';
+        if (!ext && mimeType) {
+          const mimeMap: Record<string, string> = {
+            'application/pdf': '.pdf',
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/gif': '.gif',
+            'application/zip': '.zip',
+            'text/plain': '.txt',
+            'application/msword': '.doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+          };
+          ext = mimeMap[mimeType] || '';
+        }
+
+        if (!ext) {
+          console.error('❌ File has no extension and could not be inferred', { originalFilename, filepath: file.filepath, mimetype: mimeType });
+          return res.status(400).json({ error: 'El archivo debe incluir extensión o tener un mimetype reconocible (ej. .pdf, .png).' });
+        }
+
+        let filename = originalFilename;
+        if (!path.extname(filename)) {
+          filename = `${filename}${ext}`;
+        }
+
         // Sanitize filename to avoid GitHub API issues
         filename = filename.replace(/[^a-zA-Z0-9._\-]/g, '_');
         console.log('✅ File read successfully, size:', fileBuffer.length, 'filename:', filename);

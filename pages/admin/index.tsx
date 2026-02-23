@@ -30,6 +30,7 @@ export default function AdminPanel() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [links, setLinks] = useState<LinkConfig[]>([]);
@@ -376,6 +377,7 @@ export default function AdminPanel() {
     }
     
     setUploading(true);
+    setUploadError(null);
     const formData = new FormData(form);
 
     try {
@@ -402,7 +404,16 @@ export default function AdminPanel() {
         status: error.response?.status,
         data: error.response?.data,
       });
-      showAlert('Error', 'Error al subir archivo: ' + errorMsg, 'error');
+
+      // Show inline error for extension/mimetype issues with clearer message
+      if (error.response?.status === 400 && /extensi/i.test(String(errorMsg))) {
+        const friendly = 'El archivo debe incluir una extensión válida (ej. .pdf, .png). Cambia el nombre o selecciona un archivo con tipo reconocido.';
+        setUploadError(friendly);
+        showAlert('Error', friendly, 'error');
+      } else {
+        setUploadError(String(errorMsg));
+        showAlert('Error', 'Error al subir archivo: ' + errorMsg, 'error');
+      }
     } finally {
       setUploading(false);
     }
@@ -521,6 +532,9 @@ export default function AdminPanel() {
                               hover:file:bg-purple-600 file:cursor-pointer
                               transition-all backdrop-blur-sm"
                   />
+                  {uploadError && (
+                    <p className="mt-2 text-sm text-red-400">{uploadError}</p>
+                  )}
                 </div>
               </div>
               <button
