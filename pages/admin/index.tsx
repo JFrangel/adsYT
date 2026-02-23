@@ -631,15 +631,25 @@ export default function AdminPanel() {
                           Subido: {new Date(file.uploadedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDelete(file.id, file.filename)}
-                        className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-xl 
-                                  hover:from-red-600 hover:to-pink-700 transition-all duration-300
-                                  shadow-xl hover:shadow-2xl hover:scale-105 transform text-sm sm:text-base flex items-center justify-center gap-2"
-                      >
-                        <DeleteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                        Eliminar
-                      </button>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => handleAdminDownload(file)}
+                          className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base"
+                        >
+                          <DownloadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          Descargar
+                        </button>
+
+                        <button
+                          onClick={() => handleDelete(file.id, file.filename)}
+                          className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-xl 
+                                    hover:from-red-600 hover:to-pink-700 transition-all duration-300
+                                    shadow-xl hover:shadow-2xl hover:scale-105 transform text-sm sm:text-base flex items-center justify-center gap-2"
+                        >
+                          <DeleteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -841,13 +851,6 @@ export default function AdminPanel() {
                           </div>
                         </div>
                         <div className="flex lg:flex-col gap-2 w-full lg:w-auto">
-                          <button
-                            onClick={() => handleAdminDownload(file)}
-                            className="px-4 py-2.5 rounded-lg font-bold text-xs bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
-                          >
-                            <DownloadIcon className="w-4 h-4" />
-                            Descargar
-                          </button>
                           {linksMode === 'single' && (
                             <button
                               onClick={() => setActiveLink(link.id)}
