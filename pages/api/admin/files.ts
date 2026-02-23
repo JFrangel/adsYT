@@ -25,17 +25,27 @@ async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fiel
     multiples: false,
     uploadDir: uploadDir,
     keepExtensions: true,
-    allowEmptyFiles: true, // Allow parsing to proceed (we'll validate size ourselves)
-    minFileSize: 0, // We'll validate size manually
+    allowEmptyFiles: true,
+    minFileSize: 0,
+    maxFileSize: 50 * 1024 * 1024,
+    maxFields: 10,
+    maxFiles: 1,
   });
   
   return new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) {
-        console.error('❌ Form parse error:', err);
-        reject(err);
+        console.error('❌ Form parse error details:', {
+          message: err.message,
+          code: err.code,
+          statusCode: err.statusCode,
+        });
+        reject(new Error(`Form parsing failed: ${err.message}`));
       } else {
-        console.log('✅ Form parsed successfully');
+        console.log('✅ Form parsed successfully', {
+          fieldsCount: Object.keys(fields).length,
+          filesCount: Object.keys(files).length,
+        });
         resolve({ fields, files });
       }
     });
@@ -183,11 +193,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           file: { ...newFile, downloads: 0 }
         });
       } catch (parseError: any) {
-        console.error('❌ Form parse error:', {
+        console.error('❌ Form parse error caught:', {
           message: parseError.message,
           code: parseError.code,
+          statusCode: parseError.statusCode,
           stack: parseError.stack,
         });
+        
+        // Return user-friendly error message
+        if (parseError.statusCode === 422) {
+          return res.status(400).json({ 
+            error: 'Invalid file data. Please ensure you selected a valid file and try again.' 
+          });
+        }
+        
         return res.status(400).json({ error: 'Failed to parse form: ' + parseError.message });
       }
     }
