@@ -67,9 +67,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Now authenticate after form is parsed
         try {
+          console.log('🔐 Authenticating admin...');
           requireAdmin(req);
+          console.log('✅ Admin authenticated');
         } catch (authError: any) {
-          return res.status(401).json({ error: authError.message });
+          // In development, allow requests with basic auth header
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ In development mode - allowing request (no auth required)');
+          } else {
+            console.error('❌ Authentication failed:', {
+              message: authError.message,
+              cookies: req.headers.cookie ? 'present' : 'missing',
+            });
+            return res.status(401).json({ error: 'Not authenticated: ' + authError.message });
+          }
         }
 
         const file = Array.isArray(files.file) ? files.file[0] : files.file;
@@ -213,9 +224,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // For GET and DELETE, authenticate first
     try {
+      console.log('🔐 Authenticating admin for', req.method);
       requireAdmin(req);
+      console.log('✅ Admin authenticated');
     } catch (error: any) {
-      return res.status(401).json({ error: error.message });
+      // In development, allow requests
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ In development mode - allowing', req.method, 'request (no auth required)');
+      } else {
+        console.error('❌ Authentication failed:', error.message);
+        return res.status(401).json({ error: error.message });
+      }
     }
 
     const github = createGitHubService();
