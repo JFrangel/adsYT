@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
-import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, LoadingSpinner } from '@/components/Icons';
+import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, DownloadIcon, LoadingSpinner } from '@/components/Icons';
 import { AlertDialog, ConfirmDialog, PromptDialog } from '@/components/Dialog';
 import { useDialog } from '@/hooks/useDialog';
 
@@ -440,6 +440,50 @@ export default function AdminPanel() {
     );
   };
 
+  const handleAdminDownload = async (file: FileItem) => {
+    try {
+      console.log('Admin download started for:', file.filename);
+      const resp = await fetch(`/api/download?file=${file.id}`, {
+        method: 'GET',
+        credentials: 'same-origin',
+      });
+
+      if (!resp.ok) {
+        let err = `Error ${resp.status}`;
+        try {
+          const json = await resp.json();
+          err = json.error || json.message || JSON.stringify(json);
+        } catch (e) {}
+        showAlert('Error', 'No se pudo descargar: ' + err, 'error');
+        return;
+      }
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json') || contentType.includes('text/html')) {
+        const json = await resp.json();
+        const err = json.error || json.message || JSON.stringify(json);
+        showAlert('Error', 'Respuesta inesperada del servidor: ' + err, 'error');
+        return;
+      }
+
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = file.filename || 'archivo';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
+      showAlert('Descarga', `Iniciada la descarga de ${file.name}`, 'success');
+    } catch (err: any) {
+      console.error('Admin download error:', err);
+      showAlert('Error', 'Error al descargar el archivo', 'error');
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await axios.post('/api/admin/logout');
@@ -797,6 +841,13 @@ export default function AdminPanel() {
                           </div>
                         </div>
                         <div className="flex lg:flex-col gap-2 w-full lg:w-auto">
+                          <button
+                            onClick={() => handleAdminDownload(file)}
+                            className="px-4 py-2.5 rounded-lg font-bold text-xs bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                          >
+                            <DownloadIcon className="w-4 h-4" />
+                            Descargar
+                          </button>
                           {linksMode === 'single' && (
                             <button
                               onClick={() => setActiveLink(link.id)}

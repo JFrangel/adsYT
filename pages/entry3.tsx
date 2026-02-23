@@ -137,7 +137,7 @@ export default function Entry3() {
           } else {
             window.open(adUrl, '_blank');
           }
-        }, 2000);
+        }, 2500);
       } catch (adError) {
         console.error('⚠️ Ad error:', adError);
         if (adWindow && !adWindow.closed) {
