@@ -348,8 +348,30 @@ export default function AdminPanel() {
     }
     
     const file = fileInput.files[0];
+    
+    console.log('📄 File validation:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+    });
+    
     if (file.size === 0) {
       showAlert('Error', 'El archivo está vacío, selecciona un archivo válido', 'error');
+      return;
+    }
+    
+    // Additional validation: read first bytes to ensure file has content
+    try {
+      const buffer = await file.slice(0, 100).arrayBuffer();
+      const view = new Uint8Array(buffer);
+      console.log('✅ File content verified:', {
+        firstBytes: Array.from(view.slice(0, 20)).join(','),
+        hasContent: view.length > 0,
+      });
+    } catch (readError) {
+      console.error('❌ Could not read file:', readError);
+      showAlert('Error', 'No se pudo leer el archivo, intenta con otro archivo', 'error');
       return;
     }
     
@@ -357,15 +379,29 @@ export default function AdminPanel() {
     const formData = new FormData(form);
 
     try {
-      console.log('📤 Uploading file:', { name: file.name, size: file.size });
-      await axios.post('/api/admin/files', formData);
-
+      console.log('📤 Uploading file via FormData:', { 
+        name: file.name, 
+        size: file.size,
+        formDataSize: JSON.stringify(Array.from(formData.entries())).length,
+      });
+      
+      const uploadResponse = await axios.post('/api/admin/files', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      
+      console.log('✅ Upload successful:', uploadResponse.data);
       showAlert('Archivo Subido', 'Archivo subido correctamente', 'success');
       fetchFiles();
       form.reset();
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || error.message;
-      console.error('❌ Upload failed:', errorMsg);
+      console.error('❌ Upload failed:', {
+        message: errorMsg,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
       showAlert('Error', 'Error al subir archivo: ' + errorMsg, 'error');
     } finally {
       setUploading(false);

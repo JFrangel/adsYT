@@ -106,6 +106,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Read file
         console.log('📖 Reading file from:', file.filepath);
         const fileBuffer = fs.readFileSync(file.filepath);
+        
+        console.log('📊 File buffer info:', {
+          filepath: file.filepath,
+          bufferLength: fileBuffer.length,
+          bufferType: typeof fileBuffer,
+          fileSize: file.size,
+          firstBytes: fileBuffer.slice(0, 20).toString('hex'),
+        });
+        
+        if (fileBuffer.length === 0) {
+          console.error('❌ File buffer is EMPTY after reading!', {
+            filepath: file.filepath,
+            reportedSize: file.size,
+            actualSize: fileBuffer.length,
+          });
+          return res.status(400).json({ 
+            error: 'File content is empty. Please check your file is not corrupted.' 
+          });
+        }
+        
+        if (fileBuffer.length !== file.size) {
+          console.warn('⚠️ Buffer size mismatch!', {
+            reportedSize: file.size,
+            actualSize: fileBuffer.length,
+            difference: file.size - fileBuffer.length,
+          });
+        }
+        
         let filename = file.originalFilename || 'unnamed';
         
         // Sanitize filename to avoid GitHub API issues
@@ -124,13 +152,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const githubData = createGitHubDataService();
 
         // Upload to GitHub DATA branch (not main) to avoid builds
-        console.log('🔧 Uploading to GitHub DATA branch:', `files/${filename}`);
+        console.log('🔧 Uploading to GitHub DATA branch:', `files/${filename}`, 'size:', fileBuffer.length);
         const result = await githubData.uploadFile(
           `files/${filename}`,
           fileBuffer,
           `[DATA] Upload ${filename} [skip ci][skip netlify]`
         );
-        console.log('✅ GitHub upload successful to DATA branch, SHA:', result.content?.sha);
+        
+        console.log('✅ GitHub upload response:', {
+          hasContent: !!result.content,
+          sha: result.content?.sha,
+          size: result.content?.size,
+        });
+        
+        if (!result.content || !result.content.sha) {
+          console.error('❌ GitHub upload failed - no content/sha in response:', result);
+          return res.status(500).json({ 
+            error: 'Failed to upload file to GitHub - invalid response' 
+          });
+        }
+        
+        console.log('✅ GitHub upload successful to DATA branch, SHA:', result.content.sha);
 
         // Update manifest in DATA branch to avoid builds
         console.log('📝 Updating manifest in data branch to avoid builds...');

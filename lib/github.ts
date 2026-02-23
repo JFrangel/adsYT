@@ -73,12 +73,21 @@ export class GitHubService {
     const encodedContent = fileBuffer.toString('base64');
     const url = `${GITHUB_API}/repos/${this.config.owner}/${this.config.repo}/contents/${path}`;
     
-    console.log('📡 GitHub Upload Request:', {
+    console.log('📡 GitHub Upload Start:', {
       url,
       branch: this.config.branch,
-      contentLength: encodedContent.length,
+      fileBufferLength: fileBuffer.length,
+      encodedContentLength: encodedContent.length,
       messageLength: message.length,
     });
+    
+    if (fileBuffer.length === 0) {
+      console.error('❌ ERROR: Attempting to upload empty buffer!', {
+        path,
+        bufferLength: 0,
+      });
+      throw new Error('Cannot upload empty file - buffer length is 0');
+    }
     
     try {
       // Check if file already exists to get the SHA
@@ -95,8 +104,19 @@ export class GitHubService {
         console.log('📝 File exists, updating with SHA:', existingFile.sha);
       }
       
+      console.log('📤 Sending to GitHub API...', {
+        contentLength: body.content.length,
+        bodySize: JSON.stringify(body).length,
+      });
+      
       const response = await axios.put(url, body, { headers: this.getHeaders() });
 
+      console.log('✅ GitHub Upload Complete:', {
+        status: response.status,
+        dataSize: JSON.stringify(response.data).length,
+        hasSha: !!response.data.content?.sha,
+      });
+      
       return response.data;
     } catch (error: any) {
       console.error('❌ GitHub API Error:', {
