@@ -25,27 +25,15 @@ async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fiel
     multiples: false,
     uploadDir: uploadDir,
     keepExtensions: true,
-    allowEmptyFiles: true,
-    minFileSize: 0,
-    maxFileSize: 50 * 1024 * 1024,
-    maxFields: 10,
-    maxFiles: 1,
   });
   
   return new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) {
-        console.error('❌ Form parse error details:', {
-          message: err.message,
-          code: err.code,
-          statusCode: err.statusCode,
-        });
-        reject(new Error(`Form parsing failed: ${err.message}`));
+        console.error('❌ Form parse error:', err);
+        reject(err);
       } else {
-        console.log('✅ Form parsed successfully', {
-          fieldsCount: Object.keys(fields).length,
-          filesCount: Object.keys(files).length,
-        });
+        console.log('✅ Form parsed successfully');
         resolve({ fields, files });
       }
     });
@@ -67,36 +55,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Now authenticate after form is parsed
         try {
-          console.log('🔐 Authenticating admin...');
           requireAdmin(req);
-          console.log('✅ Admin authenticated');
         } catch (authError: any) {
-          // In development, allow requests with basic auth header
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ In development mode - allowing request (no auth required)');
-          } else {
-            console.error('❌ Authentication failed:', {
-              message: authError.message,
-              cookies: req.headers.cookie ? 'present' : 'missing',
-            });
-            return res.status(401).json({ error: 'Not authenticated: ' + authError.message });
-          }
+          return res.status(401).json({ error: authError.message });
         }
 
         const file = Array.isArray(files.file) ? files.file[0] : files.file;
         const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
 
-        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename, size: file?.size });
+        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
 
         if (!file || !name) {
           console.error('❌ Missing file or name:', { file: !!file, name });
           return res.status(400).json({ error: 'File and name required' });
-        }
-
-        // Check file size (must be > 0)
-        if (!file.size || file.size === 0) {
-          console.error('❌ File is empty:', file.size);
-          return res.status(400).json({ error: 'File cannot be empty' });
         }
 
         // Check file size (50MB limit)
@@ -109,13 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Read file
         console.log('📖 Reading file from:', file.filepath);
         const fileBuffer = fs.readFileSync(file.filepath);
-        
-        // Verify file was read correctly
-        if (!fileBuffer || fileBuffer.length === 0) {
-          console.error('❌ Failed to read file or file is empty');
-          return res.status(400).json({ error: 'Failed to read file - file may be corrupted' });
-        }
-        
         let filename = file.originalFilename || 'unnamed';
         
         // Sanitize filename to avoid GitHub API issues
@@ -204,37 +168,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           file: { ...newFile, downloads: 0 }
         });
       } catch (parseError: any) {
-        console.error('❌ Form parse error caught:', {
+        console.error('❌ Form parse error:', {
           message: parseError.message,
           code: parseError.code,
-          statusCode: parseError.statusCode,
           stack: parseError.stack,
         });
-        
-        // Return user-friendly error message
-        if (parseError.statusCode === 422) {
-          return res.status(400).json({ 
-            error: 'Invalid file data. Please ensure you selected a valid file and try again.' 
-          });
-        }
-        
         return res.status(400).json({ error: 'Failed to parse form: ' + parseError.message });
       }
     }
 
     // For GET and DELETE, authenticate first
     try {
-      console.log('🔐 Authenticating admin for', req.method);
       requireAdmin(req);
-      console.log('✅ Admin authenticated');
     } catch (error: any) {
-      // In development, allow requests
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ In development mode - allowing', req.method, 'request (no auth required)');
-      } else {
-        console.error('❌ Authentication failed:', error.message);
-        return res.status(401).json({ error: error.message });
-      }
+      return res.status(401).json({ error: error.message });
     }
 
     const github = createGitHubService();
