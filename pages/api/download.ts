@@ -105,28 +105,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Decode base64 content from GitHub
       const fileBuffer = Buffer.from(fileContent.content, 'base64');
       
-      console.log('📦 File buffer created:', {
+      console.log('📦 File prepared:', {
+        filename: fileItem.filename,
         size: fileBuffer.length,
-        filename: fileItem.filename
+        method: req.method
       });
       
-      // Set response headers for download
+      // Critical headers for reliable downloads
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Length', fileBuffer.length.toString());
+      res.setHeader('Content-Length', String(fileBuffer.length));
       res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
-      
-      // Cache headers
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-
-      console.log('✅ Download response ready:', {
-        size: fileBuffer.length,
-        filename: fileItem.filename
-      });
-
-      // Send the file buffer directly
-      return res.end(fileBuffer);
+      
+      // Extra headers for mobile compatibility
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Accept-Ranges', 'bytes');
+      
+      console.log('✅ Headers set, sending file buffer');
+      
+      // Send file
+      res.end(fileBuffer);
     } catch (downloadError: any) {
       console.error('❌ Download error:', {
         filename: fileItem.filename,
