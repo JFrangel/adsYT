@@ -158,8 +158,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       console.log('✅ Headers set, sending file buffer of', fileBuffer.length, 'bytes');
       
-      // Send file
-      res.end(fileBuffer);
+      // Send file using write + end (more reliable than just end)
+      res.write(fileBuffer);
+      res.end();
     } catch (downloadError: any) {
       console.error('❌ Download error:', {
         filename: fileItem.filename,

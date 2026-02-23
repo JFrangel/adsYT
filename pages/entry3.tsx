@@ -60,123 +60,61 @@ export default function Entry3() {
       // Abrir ventana del anuncio INMEDIATAMENTE
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // PASO 1: Descargar el archivo usando fetch + blob
-      console.log('📥 Starting file download from API...');
+      // MÉTODO MÁS SIMPLE: descarga directa con <a> tag
+      console.log('📥 Creating download link...');
       const downloadUrl = `/api/download?file=${file.id}`;
-      console.log('🔗 URL:', downloadUrl);
       
-      let response;
-      try {
-        response = await fetch(downloadUrl);
-        console.log('📡 Response received:', {
-          status: response.status,
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length')
-        });
-      } catch (fetchError: any) {
-        console.error('❌ Network error:', fetchError);
-        throw new Error(`Error de conexión: ${fetchError.message}`);
-      }
-      
-      // Validar respuesta
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Server error response:', errorText);
-        
-        let errorMsg = 'Error del servidor';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMsg = errorJson.error || errorJson.message || errorText;
-        } catch {
-          errorMsg = errorText || `HTTP ${response.status}`;
-        }
-        
-        throw new Error(errorMsg);
-      }
-      
-      // Convertir a blob
-      console.log('🔄 Converting to blob...');
-      let blob;
-      try {
-        blob = await response.blob();
-        console.log(`💾 Blob created: ${blob.size} bytes, type: ${blob.type}`);
-      } catch (blobError: any) {
-        console.error('❌ Error converting to blob:', blobError);
-        throw new Error(`Error al procesar el archivo: ${blobError.message}`);
-      }
-      
-      if (blob.size === 0) {
-        console.error('❌ Empty file!');
-        throw new Error('El servidor envió un archivo vacío');
-      }
-      
-      // Crear URL de descarga
-      console.log('🔗 Creating download URL...');
-      const downloadLink = URL.createObjectURL(blob);
-      
-      // Crear elemento <a>
       const link = document.createElement('a');
-      link.href = downloadLink;
+      link.href = downloadUrl;
       link.download = file.filename || 'archivo';
       link.style.display = 'none';
       
-      // Agregar al DOM e inmediatamente hacer click
-      console.log('📎 Adding link to DOM...');
+      // Agregar al DOM
       document.body.appendChild(link);
       
-      console.log('🔨 Clicking link to trigger download...');
+      // Click
+      console.log('🔨 Triggering download...');
       link.click();
       
-      // Limpiar después
+      // Limpiar
       setTimeout(() => {
-        console.log('🧹 Cleaning up...');
-        if (document.body.contains(link)) {
-          document.body.removeChild(link);
-        }
-        URL.revokeObjectURL(downloadLink);
-      }, 500);
+        document.body.removeChild(link);
+      }, 100);
       
-      console.log('✅ Download completed successfully');
+      console.log('✅ Download link clicked');
       
       // PASO 2: Registrar descarga (no bloqueante)
-      console.log('📊 Registering download count...');
+      console.log('📊 Registering download...');
       axios.post(`/api/download?file=${file.id}`)
-        .then(() => console.log('✅ Download count registered'))
-        .catch(err => console.warn('⚠️ Download registration failed (not critical):', err.message));
+        .then(() => console.log('✅ Download registered'))
+        .catch(err => console.warn('⚠️ Could not register:', err.message));
       
       // PASO 3: Abrir anuncio
       try {
-        console.log('🔄 Fetching ad link...');
+        console.log('🔄 Getting ad link...');
         const adResponse = await axios.get('/api/get-redirect-link');
         const adUrl = adResponse.data.url;
-        console.log('✅ Ad URL obtained');
         
         setTimeout(() => {
           if (adWindow && !adWindow.closed) {
-            console.log('📺 Opening ad in existing window');
             adWindow.location.href = adUrl;
+            console.log('🚀 Ad opened');
           } else {
-            console.log('📺 Opening ad in new window');
             window.open(adUrl, '_blank');
           }
         }, 2000);
-      } catch (adError: any) {
-        console.error('⚠️ Ad error (not critical):', adError.message);
+      } catch (adError) {
+        console.error('⚠️ Ad error:', adError);
         if (adWindow && !adWindow.closed) {
           adWindow.close();
         }
       }
       
     } catch (error: any) {
-      console.error('❌ DOWNLOAD FAILED:', {
-        error: error.message,
-        stack: error.stack
-      });
-      
+      console.error('❌ Download error:', error);
       showAlert(
         'Error en la Descarga',
-        error.message || 'No se pudo descargar el archivo. Intenta nuevamente.',
+        'No se pudo descargar el archivo. Intenta nuevamente.',
         'error'
       );
     }
