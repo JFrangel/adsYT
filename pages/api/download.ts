@@ -93,19 +93,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Download file from GitHub DATA branch (works on both local and serverless)
     try {
       console.log('📥 Downloading file from GitHub DATA branch:', fileItem.filename);
+      console.log('🔍 Looking for file at path: files/' + fileItem.filename);
       
       // Get file from DATA branch
       const fileContent = await githubData.getFile(`files/${fileItem.filename}`);
       
-      if (!fileContent) {
-        console.error('File not found in DATA branch:', fileItem.filename);
-        return res.status(404).json({ error: 'File not available for download' });
-      }
-
-      // Decode base64 content from GitHub
-      const fileBuffer = Buffer.from(fileContent.content, 'base64');
+      console.log('📦 File retrieved from GitHub:', {
+        hasContent: !!fileContent,
+        hasContentProperty: !!fileContent?.content,
+        contentType: typeof fileContent?.content,
+        contentLength: fileContent?.content?.length || 0
+      });
       
-      console.log('📦 File prepared:', {
+      if (!fileContent) {
+        console.error('❌ File object is null/undefined');
+        return res.status(404).json({ error: 'File not found in DATA branch' });
+      }
+      
+      if (!fileContent.content) {
+        console.error('❌ File content is null/undefined');
+        return res.status(404).json({ error: 'File has no content' });
+      }
+      
+      // Decode base64 content from GitHub
+      console.log('🔄 Decoding base64 content...');
+      let fileBuffer;
+      
+      try {
+        fileBuffer = Buffer.from(fileContent.content, 'base64');
+        console.log('✅ Base64 decoded successfully:', {
+          decodedSize: fileBuffer.length,
+          originalContentLength: fileContent.content.length
+        });
+      } catch (decodeError) {
+        console.error('❌ Base64 decode error:', decodeError);
+        return res.status(500).json({ error: 'Failed to decode file content' });
+      }
+      
+      if (fileBuffer.length === 0) {
+        console.error('❌ Decoded file is EMPTY!', {
+          contentLength: fileContent.content.length,
+          contentSample: fileContent.content.substring(0, 100)
+        });
+        return res.status(500).json({ error: 'File content is empty after decoding' });
+      }
+      
+      console.log('📦 File prepared successfully:', {
         filename: fileItem.filename,
         size: fileBuffer.length,
         method: req.method
@@ -123,7 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Accept-Ranges', 'bytes');
       
-      console.log('✅ Headers set, sending file buffer');
+      console.log('✅ Headers set, sending file buffer of', fileBuffer.length, 'bytes');
       
       // Send file
       res.end(fileBuffer);
