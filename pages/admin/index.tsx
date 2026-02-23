@@ -331,18 +331,42 @@ export default function AdminPanel() {
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    const form = e.currentTarget as HTMLFormElement;
+    const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
+    const nameInput = form.querySelector('input[name="name"]') as HTMLInputElement;
+    
+    // Validate inputs
+    if (!nameInput.value.trim()) {
+      showAlert('Error', 'Por favor ingresa un nombre para el archivo', 'error');
+      return;
+    }
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+      showAlert('Error', 'Por favor selecciona un archivo', 'error');
+      return;
+    }
+    
+    const file = fileInput.files[0];
+    if (file.size === 0) {
+      showAlert('Error', 'El archivo está vacío, selecciona un archivo válido', 'error');
+      return;
+    }
+    
     setUploading(true);
-
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
 
     try {
+      console.log('📤 Uploading file:', { name: file.name, size: file.size });
       await axios.post('/api/admin/files', formData);
 
       showAlert('Archivo Subido', 'Archivo subido correctamente', 'success');
       fetchFiles();
-      (e.target as HTMLFormElement).reset();
+      form.reset();
     } catch (error: any) {
-      showAlert('Error', 'Error al subir archivo: ' + (error.response?.data?.error || error.message), 'error');
+      const errorMsg = error.response?.data?.error || error.message;
+      console.error('❌ Upload failed:', errorMsg);
+      showAlert('Error', 'Error al subir archivo: ' + errorMsg, 'error');
     } finally {
       setUploading(false);
     }

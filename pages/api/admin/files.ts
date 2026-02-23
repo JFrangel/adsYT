@@ -13,30 +13,37 @@ export const config = {
 };
 
 async function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> {
-  // Use system temp directory, works on both local and Netlify
   const uploadDir = path.join(os.tmpdir(), 'uploads');
   
-  // Create upload directory if it doesn't exist
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   
-  const form = formidable({ 
-    multiples: false,
-    uploadDir: uploadDir,
-    keepExtensions: true,
-  });
-  
   return new Promise((resolve, reject) => {
-    form.parse(req, (err, fields, files) => {
-      if (err) {
-        console.error('❌ Form parse error:', err);
-        reject(err);
-      } else {
+    try {
+      // Formidable v3 API - pass options in constructor
+      const form = formidable({
+        uploadDir: uploadDir,
+        keepExtensions: true,
+        maxFileSize: 50 * 1024 * 1024, // 50MB
+      });
+      
+      console.log('📦 Formidable initialized with uploadDir:', uploadDir);
+      
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          console.error('❌ Form parse error:', err.message);
+          reject(err);
+          return;
+        }
+        
         console.log('✅ Form parsed successfully');
         resolve({ fields, files });
-      }
-    });
+      });
+    } catch (error) {
+      console.error('❌ Formidable init error:', error);
+      reject(error);
+    }
   });
 }
 
@@ -48,6 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GET/DELETE require auth
     if (req.method === 'POST') {
       console.log('📤 POST request detected, parsing form...');
+      console.log('📋 Request headers:', {
+        contentType: req.headers['content-type'],
+        contentLength: req.headers['content-length'],
+      });
+      
       // Parse form first, then authenticate
       try {
         const { fields, files } = await parseForm(req);
@@ -63,18 +75,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const file = Array.isArray(files.file) ? files.file[0] : files.file;
         const name = Array.isArray(fields.name) ? fields.name[0] : fields.name;
 
-        console.log('📄 File info:', { file: !!file, name, originalFilename: file?.originalFilename });
+        console.log('📄 File info:', { 
+          file: !!file, 
+          name,
+          originalFilename: file?.originalFilename,
+          fileSize: file?.size,
+          filepath: file?.filepath,
+        });
 
-        if (!file || !name) {
-          console.error('❌ Missing file or name:', { file: !!file, name });
-          return res.status(400).json({ error: 'File and name required' });
+        if (!file) {
+          console.error('❌ No file uploaded');
+          return res.status(400).json({ error: 'No file provided in request' });
         }
 
-        // Check file size (50MB limit)
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-          console.error('❌ File too large:', file.size);
-          return res.status(400).json({ error: 'File too large (max 50MB)' });
+        if (!name) {
+          console.error('❌ No file name provided');
+          return res.status(400).json({ error: 'File name is required' });
+        }
+
+        if (!file.originalFilename) {
+          console.error('❌ File has no name');
+          return res.status(400).json({ error: 'File has no name' });
+        }
+
+        if (file.size === 0) {
+          console.error('❌ File is empty:', file.originalFilename);
+          return res.status(400).json({ error: 'File is empty, please select a file with content' });
         }
 
         // Read file
@@ -169,11 +195,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       } catch (parseError: any) {
         console.error('❌ Form parse error:', {
-          message: parseError.message,
           code: parseError.code,
+          message: parseError.message,
+          statusCode: parseError.statusCode,
           stack: parseError.stack,
         });
-        return res.status(400).json({ error: 'Failed to parse form: ' + parseError.message });
+        
+        // Handle specific formidable errors
+        if (parseError.code === 'LIMIT_PART_COUNT') {
+          return res.status(400).json({ error: 'Too many fields' });
+        } else if (parseError.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ error: 'File too large (max 50MB)' });
+        } else if (parseError.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({ error: 'Too many files' });
+        } else if (parseError.code === 'LIMIT_FIELD_KEY') {
+          return res.status(400).json({ error: 'Field name too long' });
+        } else if (parseError.code === 'LIMIT_FIELD_VALUE') {
+          return res.status(400).json({ error: 'Field value too long' });
+        }
+        
+        return res.status(400).json({ 
+          error: 'Failed to parse form: ' + parseError.message,
+          code: parseError.code,
+        });
       }
     }
 

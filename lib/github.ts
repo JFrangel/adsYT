@@ -73,13 +73,41 @@ export class GitHubService {
     const encodedContent = fileBuffer.toString('base64');
     const url = `${GITHUB_API}/repos/${this.config.owner}/${this.config.repo}/contents/${path}`;
     
-    const response = await axios.put(url, {
-      message,
-      content: encodedContent,
+    console.log('📡 GitHub Upload Request:', {
+      url,
       branch: this.config.branch,
-    }, { headers: this.getHeaders() });
+      contentLength: encodedContent.length,
+      messageLength: message.length,
+    });
+    
+    try {
+      // Check if file already exists to get the SHA
+      const existingFile = await this.getFile(path);
+      const body: any = {
+        message,
+        content: encodedContent,
+        branch: this.config.branch,
+      };
+      
+      // If file exists, include the SHA for update
+      if (existingFile && existingFile.sha) {
+        body.sha = existingFile.sha;
+        console.log('📝 File exists, updating with SHA:', existingFile.sha);
+      }
+      
+      const response = await axios.put(url, body, { headers: this.getHeaders() });
 
-    return response.data;
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ GitHub API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message,
+        documentation_url: error.response?.data?.documentation_url,
+        errors: error.response?.data?.errors,
+      });
+      throw error;
+    }
   }
 
   getRawUrl(path: string): string {
