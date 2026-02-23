@@ -105,33 +105,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Decode base64 content from GitHub
       const fileBuffer = Buffer.from(fileContent.content, 'base64');
       
-      // Set headers for download with mobile compatibility
-      // Use application/octet-stream to force download on all devices
+      console.log('📦 File buffer created:', {
+        size: fileBuffer.length,
+        filename: fileItem.filename
+      });
+      
+      // Set response headers for download
       res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Length', fileBuffer.length.toString());
+      res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
       
-      // RFC 5987 encoding for filename with special characters compatibility
-      const filename = fileItem.filename.replace(/"/g, '\\"');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
-      
-      // Additional headers for better compatibility
-      res.setHeader('Content-Length', fileBuffer.length);
+      // Cache headers
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      
-      // CORS headers for mobile browsers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      console.log('📊 Download response headers set:', {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': res.getHeader('Content-Disposition'),
-        'Content-Length': fileBuffer.length,
+      console.log('✅ Download response ready:', {
+        size: fileBuffer.length,
+        filename: fileItem.filename
       });
 
-      // Send file to client
-      res.end(fileBuffer);
+      // Send the file buffer directly
+      return res.end(fileBuffer);
     } catch (downloadError: any) {
       console.error('❌ Download error:', {
         filename: fileItem.filename,

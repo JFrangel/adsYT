@@ -57,105 +57,64 @@ export default function Entry3() {
     try {
       console.log('🎯 Download started for:', file.name);
       
-      // Detectar si es dispositivo móvil
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      // Abrir ventana del anuncio INMEDIATAMENTE (síncrono con el click)
+      // Abrir ventana del anuncio INMEDIATAMENTE
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // Descargar archivo usando fetch para mejor compatibilidad con móviles
-      console.log('📥 Fetching file blob...');
+      // Método simple: usar <a> con href directo
+      const link = document.createElement('a');
+      link.href = `/api/download?file=${file.id}`;
+      link.setAttribute('download', file.filename);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Download triggered');
+      
+      // Track download (POST request)
+      console.log('📊 Tracking download...');
       try {
-        const downloadResponse = await fetch(`/api/download?file=${file.id}`);
-        
-        if (!downloadResponse.ok) {
-          throw new Error(`Download failed: ${downloadResponse.statusText}`);
-        }
-        
-        // Obtener el blob del archivo
-        const fileBlob = await downloadResponse.blob();
-        
-        // Crear URL temporal
-        const blobUrl = URL.createObjectURL(fileBlob);
-        
-        // Crear elemento <a> temporal
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = file.filename; // Usar el nombre original del archivo
-        
-        // En móviles, agregar a documento antes de hacer click
-        if (isMobile) {
-          document.body.appendChild(link);
-          console.log('📱 Mobile download method: creating temporary link in DOM');
-        }
-        
-        // Simular click para descargar
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Liberar memoria después de 100ms
-        setTimeout(() => {
-          URL.revokeObjectURL(blobUrl);
-        }, 100);
-        
-        console.log('✅ File download initiated');
-        
-      } catch (downloadError) {
-        console.error('❌ Error downloading file:', downloadError);
-        showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
-        if (adWindow && !adWindow.closed) {
-          adWindow.close();
-        }
-        return;
+        await axios.post(`/api/download?file=${file.id}`);
+        console.log('✅ Download tracked');
+      } catch (trackError) {
+        console.error('⚠️ Failed to track download:', trackError);
+        // No mostrar error al usuario - esto no es crítico
       }
       
-      // Track download (no bloqueante) - esto solo cuenta descargas, NO clicks de ads
-      axios.post(`/api/download?file=${file.id}`)
-        .then(() => console.log('✅ Download tracked'))
-        .catch(error => console.error('❌ Error tracking download:', error));
-      
+      // Obtener y abrir URL de anuncio con delay
       try {
-        // Obtener URL del anuncio - ESTO sí trackea clicks de ads
         console.log('🔄 Getting ad link...');
-        const response = await axios.get('/api/get-redirect-link');
-        const adUrl = response.data.url;
+        const adResponse = await axios.get('/api/get-redirect-link');
+        const adUrl = adResponse.data.url;
         
-        console.log('✅ Ad link obtained:', { 
-          url: adUrl, 
-          linkId: response.data.linkId, 
-          linkName: response.data.linkName 
-        });
+        console.log('✅ Ad link obtained:', adResponse.data.linkName);
         
-        // Esperar 2 segundos para que la descarga se inicie completamente
+        // Esperar 2 segundos para que la descarga se inicie
         setTimeout(() => {
-          // Si la ventana sigue abierta, redirigir a la URL real
           if (adWindow && !adWindow.closed) {
-            console.log('🚀 Redirecting ad window to:', response.data.linkName);
             adWindow.location.href = adUrl;
+            console.log('🚀 Ad window redirected');
           } else {
-            // Si el popup fue bloqueado, usar fallback en nueva pestaña
-            console.warn('Popup blocked, opening in new tab as fallback');
-            // Abrir en nueva pestaña como fallback
-            window.open(adUrl, '_blank', 'noopener,noreferrer');
+            console.warn('⚠️ Ad window was blocked');
+            window.open(adUrl, '_blank');
           }
-        }, 2000); // 2 segundos para asegurar que la descarga se inicie
+        }, 2000);
         
-      } catch (error) {
-        console.error('❌ Error getting ad link:', error);
-        // Cerrar ventana vacía si hay error
+      } catch (adError) {
+        console.error('❌ Error getting ad link:', adError);
+        
         if (adWindow && !adWindow.closed) {
           adWindow.close();
         }
-        // Fallback a ad-visit en nueva pestaña después de delay
-        setTimeout(() => {
-          window.open('/ad-visit', '_blank', 'noopener,noreferrer');
-        }, 2000);
       }
       
-    } catch (error) {
-      console.error('❌ Error in download process:', error);
-      showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
+    } catch (error: any) {
+      console.error('❌ Download error:', error);
+      showAlert(
+        'Error de Descarga', 
+        'Hubo un error al descargar el archivo. Intenta de nuevo.',
+        'error'
+      );
     }
   };
 
