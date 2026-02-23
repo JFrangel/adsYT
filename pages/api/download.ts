@@ -90,88 +90,109 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Download file from GitHub DATA branch (works on both local and serverless)
+      // Download file from GitHub DATA branch (works on both local and serverless)
     try {
       console.log('📥 Downloading file from GitHub DATA branch:', fileItem.filename);
       console.log('🔍 Looking for file at path: files/' + fileItem.filename);
-      
-      // Get file from DATA branch
+
+      // Get file metadata from DATA branch
       const fileContent = await githubData.getFile(`files/${fileItem.filename}`);
-      
-      console.log('📦 File retrieved from GitHub:', {
-        hasContent: !!fileContent,
+
+      console.log('📦 File metadata retrieved from GitHub:', {
         hasContentProperty: !!fileContent?.content,
-        contentType: typeof fileContent?.content,
-        contentLength: fileContent?.content?.length || 0
+        download_url: fileContent?.download_url,
+        sha: fileContent?.sha,
+        size: fileContent?.size,
       });
-      
+
       if (!fileContent) {
         console.error('❌ File object is null/undefined');
         return res.status(404).json({ error: 'File not found in DATA branch' });
       }
-      
-      if (!fileContent.content) {
-        console.error('❌ File content is null/undefined');
-        return res.status(404).json({ error: 'File has no content' });
+
+      // If content is present (small files) decode and send
+      if (fileContent.content) {
+        try {
+          const fileBuffer = Buffer.from(fileContent.content, 'base64');
+
+          if (fileBuffer.length === 0) {
+            console.error('❌ Decoded file is EMPTY!', { filename: fileItem.filename });
+            return res.status(500).json({ error: 'File content is empty after decoding' });
+          }
+
+          // Critical headers for reliable downloads
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Length', String(fileBuffer.length));
+          res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Accept-Ranges', 'bytes');
+
+          console.log('✅ Sending decoded buffer, bytes:', fileBuffer.length);
+          res.write(fileBuffer);
+          res.end();
+          return;
+        } catch (decodeError: any) {
+          console.error('❌ Base64 decode error:', decodeError);
+          return res.status(500).json({ error: 'Failed to decode file content' });
+        }
       }
-      
-      // Decode base64 content from GitHub
-      console.log('🔄 Decoding base64 content...');
-      let fileBuffer;
-      
+
+      // For large files GitHub may not include 'content' — stream from download_url instead
+      const downloadUrl = fileContent.download_url || githubData.getRawUrl(`files/${fileItem.filename}`);
+      if (!downloadUrl) {
+        console.error('❌ No download URL available for file');
+        return res.status(500).json({ error: 'No download URL available for file' });
+      }
+
+      console.log('🔁 Streaming file from:', downloadUrl);
+
       try {
-        fileBuffer = Buffer.from(fileContent.content, 'base64');
-        console.log('✅ Base64 decoded successfully:', {
-          decodedSize: fileBuffer.length,
-          originalContentLength: fileContent.content.length
+        const axios = (await import('axios')).default;
+        const streamResp = await axios.get(downloadUrl, {
+          responseType: 'stream',
+          headers: githubData ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN || ''}` } : undefined,
         });
-      } catch (decodeError) {
-        console.error('❌ Base64 decode error:', decodeError);
-        return res.status(500).json({ error: 'Failed to decode file content' });
-      }
-      
-      if (fileBuffer.length === 0) {
-        console.error('❌ Decoded file is EMPTY!', {
-          contentLength: fileContent.content.length,
-          contentSample: fileContent.content.substring(0, 100)
+
+        // Proxy headers
+        const contentLength = streamResp.headers['content-length'];
+        const contentType = streamResp.headers['content-type'] || 'application/octet-stream';
+
+        res.setHeader('Content-Type', contentType);
+        if (contentLength) res.setHeader('Content-Length', String(contentLength));
+        res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        streamResp.data.pipe(res);
+        streamResp.data.on('end', () => {
+          console.log('✅ Stream finished for', fileItem.filename);
         });
-        return res.status(500).json({ error: 'File content is empty after decoding' });
+        streamResp.data.on('error', (err: any) => {
+          console.error('❌ Stream error:', err);
+          try { res.end(); } catch {};
+        });
+        return;
+      } catch (streamError: any) {
+        console.error('❌ Streaming error:', streamError?.message || streamError);
+        return res.status(500).json({ error: 'Failed to stream file: ' + (streamError?.message || streamError) });
       }
-      
-      console.log('📦 File prepared successfully:', {
-        filename: fileItem.filename,
-        size: fileBuffer.length,
-        method: req.method
-      });
-      
-      // Critical headers for reliable downloads
-      res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Length', String(fileBuffer.length));
-      res.setHeader('Content-Disposition', `attachment; filename="${fileItem.filename}"`);
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      
-      // Extra headers for mobile compatibility
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Accept-Ranges', 'bytes');
-      
-      console.log('✅ Headers set, sending file buffer of', fileBuffer.length, 'bytes');
-      
-      // Send file using write + end (more reliable than just end)
-      res.write(fileBuffer);
-      res.end();
     } catch (downloadError: any) {
       console.error('❌ Download error:', {
         filename: fileItem.filename,
         message: downloadError.message,
         status: downloadError.response?.status,
       });
-      
+
       if (downloadError.response?.status === 404) {
         return res.status(404).json({ error: 'File not found in DATA branch' });
       }
-      
+
       return res.status(500).json({ error: 'Failed to download file: ' + downloadError.message });
     }
   } catch (error: any) {

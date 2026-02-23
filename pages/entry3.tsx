@@ -73,21 +73,56 @@ export default function Entry3() {
         // Proceder con la descarga aunque falle el registro
       }
 
-      // Iniciar descarga desde el endpoint servidor (envía Content-Disposition)
+      // Iniciar descarga desde el endpoint servidor: primero comprobar respuesta
       try {
         const downloadUrl = `/api/download?file=${file.id}`;
-        console.log('📥 Initiating download from server:', downloadUrl);
+        console.log('📥 Fetching server download URL to verify content:', downloadUrl);
+
+        const resp = await fetch(downloadUrl, {
+          method: 'GET',
+          credentials: 'same-origin',
+        });
+
+        // Si la respuesta no es OK, intentar leer JSON de error
+        if (!resp.ok) {
+          let errMsg = `Error ${resp.status}`;
+          try {
+            const json = await resp.json();
+            errMsg = json.error || json.message || JSON.stringify(json);
+          } catch (e) {
+            console.warn('⚠️ No JSON body in error response');
+          }
+          showAlert('Error en la Descarga', `No se pudo obtener el archivo: ${errMsg}`, 'error');
+          return;
+        }
+
+        const contentType = resp.headers.get('content-type') || '';
+        // Si el servidor devolvió JSON (por ejemplo un mensaje de error), manejarlo
+        if (contentType.includes('application/json') || contentType.includes('text/json')) {
+          const json = await resp.json();
+          const errMsg = json.error || json.message || JSON.stringify(json);
+          console.warn('⚠️ Server returned JSON instead of file:', errMsg);
+          showAlert('Error en la Descarga', `Respuesta inesperada del servidor: ${errMsg}`, 'error');
+          return;
+        }
+
+        // Tratar como blob/binario y forzar descarga
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = downloadUrl;
+        link.href = blobUrl;
         link.download = file.filename || 'archivo';
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        console.log('✅ Download initiated from server endpoint');
+        URL.revokeObjectURL(blobUrl);
+
+        console.log('✅ Downloaded binary from server endpoint');
       } catch (downloadErr: any) {
         console.error('❌ Error initiating server download:', downloadErr?.message || downloadErr);
-        throw downloadErr;
+        showAlert('Error en la Descarga', 'No se pudo descargar el archivo. Intenta nuevamente.', 'error');
+        return;
       }
       
       // Abrir anuncio
