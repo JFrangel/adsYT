@@ -57,11 +57,58 @@ export default function Entry3() {
     try {
       console.log('🎯 Download started for:', file.name);
       
-      // Para Android/iOS: abrir ventana del anuncio INMEDIATAMENTE (síncrono con el click)
+      // Detectar si es dispositivo móvil
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Abrir ventana del anuncio INMEDIATAMENTE (síncrono con el click)
       const adWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
       
-      // Abrir descarga también inmediatamente
-      window.open(`/api/download?file=${file.id}`, '_blank');
+      // Descargar archivo usando fetch para mejor compatibilidad con móviles
+      console.log('📥 Fetching file blob...');
+      try {
+        const downloadResponse = await fetch(`/api/download?file=${file.id}`);
+        
+        if (!downloadResponse.ok) {
+          throw new Error(`Download failed: ${downloadResponse.statusText}`);
+        }
+        
+        // Obtener el blob del archivo
+        const fileBlob = await downloadResponse.blob();
+        
+        // Crear URL temporal
+        const blobUrl = URL.createObjectURL(fileBlob);
+        
+        // Crear elemento <a> temporal
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = file.filename; // Usar el nombre original del archivo
+        
+        // En móviles, agregar a documento antes de hacer click
+        if (isMobile) {
+          document.body.appendChild(link);
+          console.log('📱 Mobile download method: creating temporary link in DOM');
+        }
+        
+        // Simular click para descargar
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Liberar memoria después de 100ms
+        setTimeout(() => {
+          URL.revokeObjectURL(blobUrl);
+        }, 100);
+        
+        console.log('✅ File download initiated');
+        
+      } catch (downloadError) {
+        console.error('❌ Error downloading file:', downloadError);
+        showAlert('Error de Descarga', 'Error al descargar el archivo. Intenta de nuevo.', 'error');
+        if (adWindow && !adWindow.closed) {
+          adWindow.close();
+        }
+        return;
+      }
       
       // Track download (no bloqueante) - esto solo cuenta descargas, NO clicks de ads
       axios.post(`/api/download?file=${file.id}`)
