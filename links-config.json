@@ -6,10 +6,10 @@
       "name": "Monetag",
       "url": "https://omg10.com/4/9722913",
       "clicks": 0,
-      "enabled": true,
+      "enabled": false,
       "active": true,
       "createdAt": 1708000000000,
-      "updatedAt": 1708000000000
+      "updatedAt": 1774117213742
     }
   ]
 }
