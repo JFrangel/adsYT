@@ -54,7 +54,7 @@ export function Dialog({ isOpen, onClose, title, children, type = 'info', showCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -62,7 +62,7 @@ export function Dialog({ isOpen, onClose, title, children, type = 'info', showCl
       />
       
       {/* Dialog */}
-      <div className={`relative bg-gradient-to-br from-slate-900 to-purple-900 rounded-2xl shadow-2xl max-w-md w-full border-2 ${borderColors[type]} animate-scale-in`}>
+      <div className={`relative bg-dark-800 rounded-2xl shadow-2xl max-w-md w-full border ${borderColors[type]} fade-in`}>
         {/* Close button */}
         {showCloseButton && (
           <button
@@ -88,7 +88,7 @@ export function Dialog({ isOpen, onClose, title, children, type = 'info', showCl
           </h3>
 
           {/* Children */}
-          <div className="text-purple-200">
+          <div className="text-zinc-400">
             {children}
           </div>
         </div>
@@ -212,7 +212,7 @@ export function PromptDialog({
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           autoFocus
-          className="w-full px-4 py-3 bg-white/10 border-2 border-white/20 rounded-xl text-white placeholder-purple-300/50 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all mb-4"
+          className="input-field mb-4"
         />
         <div className="flex gap-3">
           <button
