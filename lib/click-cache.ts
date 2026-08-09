@@ -1,6 +1,6 @@
 // In-memory cache for click counts and last used index
-// This persists during the server session even on read-only filesystems
-// Saves checkpoints to GitHub every 1000 clicks for persistence
+// En serverless la memoria se pierde al reciclar la instancia, así que CADA
+// vista se persiste a GitHub (rama data) de inmediato, igual que las descargas.
 import { saveCheckpointToGitHub, loadCheckpointFromGitHub } from './github-storage';
 
 import fs from 'fs';
@@ -12,8 +12,11 @@ export let lastUsedIndexCache: number | undefined = undefined;
 // Contador de clicks desde el último checkpoint
 let clicksSinceCheckpoint = 0;
 let totalCheckpoints = 0;
-const CHECKPOINT_INTERVAL = 1000; // Guardar cada 1000 clicks en GitHub
+const CHECKPOINT_INTERVAL = 1; // Persistir cada vista: en serverless no hay "después"
 const LOCAL_CACHE_FILE = path.join(process.cwd(), 'config', 'clicks-local.json');
+
+// El disco local solo sirve en desarrollo (en Netlify el FS es efímero/read-only)
+const CAN_USE_LOCAL_DISK = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY && !process.env.VITEST;
 
 // Bandera para evitar múltiples cargas
 let checkpointsLoaded = false;
@@ -25,6 +28,7 @@ function ensureConfigDir() {
 
 // Guarda instantáneamente en disco local (ideal para VPS/Windows)
 function saveToLocalDisk() {
+  if (!CAN_USE_LOCAL_DISK) return;
   try {
     ensureConfigDir();
     fs.writeFileSync(LOCAL_CACHE_FILE, JSON.stringify(clickCache, null, 2));
@@ -35,6 +39,7 @@ function saveToLocalDisk() {
 
 // Cargar clicks del disco local
 function loadFromLocalDisk() {
+  if (!CAN_USE_LOCAL_DISK) return;
   try {
     if (fs.existsSync(LOCAL_CACHE_FILE)) {
       const data = JSON.parse(fs.readFileSync(LOCAL_CACHE_FILE, 'utf-8'));
@@ -168,8 +173,17 @@ export async function saveCheckpoint() {
       lastUpdated: Date.now(),
       totalCheckpoints,
     };
-    
-    const success = await saveCheckpointToGitHub(checkpointData);
+
+    // Un reintento: los guardados concurrentes pueden chocar por SHA (409)
+    let success = await saveCheckpointToGitHub(checkpointData);
+    if (!success) {
+      success = await saveCheckpointToGitHub({
+        ...clickCache,
+        lastUpdated: Date.now(),
+        totalCheckpoints,
+      });
+    }
+
     if (success) {
       clicksSinceCheckpoint = 0;
       console.log('✅ Checkpoint saved to GitHub');
