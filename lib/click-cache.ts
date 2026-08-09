@@ -9,10 +9,24 @@ import path from 'path';
 export const clickCache: { [linkId: string]: number } = {};
 export let lastUsedIndexCache: number | undefined = undefined;
 
-// Contador de clicks desde el último checkpoint
-let clicksSinceCheckpoint = 0;
+/**
+ * Vistas registradas en ESTE contenedor que aún no se han sumado en GitHub.
+ * Se guardan como incrementos (deltas) y no como totales: en serverless hay
+ * varios contenedores a la vez y escribir el total local pisaría las vistas
+ * contadas por los demás.
+ */
+const pendingDeltas: { [linkId: string]: number } = {};
+
 let totalCheckpoints = 0;
-const CHECKPOINT_INTERVAL = 1; // Persistir cada vista: en serverless no hay "después"
+
+/**
+ * Cada cuántas vistas se persiste a GitHub. Escribir en CADA vista convierte un
+ * GET público en un commit y agota los límites de escritura de la API (y es un
+ * vector de abuso trivial). Con lote de 10 la pérdida máxima por reciclaje de
+ * contenedor es pequeña y la presión sobre la API baja un orden de magnitud.
+ */
+export const FLUSH_EVERY = 10;
+
 const LOCAL_CACHE_FILE = path.join(process.cwd(), 'config', 'clicks-local.json');
 
 // El disco local solo sirve en desarrollo (en Netlify el FS es efímero/read-only)
@@ -89,21 +103,79 @@ export function getLastUsedIndex(): number | undefined {
   return lastUsedIndexCache;
 }
 
+function pendingTotal(): number {
+  return Object.values(pendingDeltas).reduce((sum, n) => sum + n, 0);
+}
+
 export async function incrementClicks(linkId: string): Promise<number> {
-  const current = clickCache[linkId] || 0;
-  clickCache[linkId] = current + 1;
-  clicksSinceCheckpoint++;
-  
-  // 🔥 Salvar en disco LOCAL instantáneamente tras cada click
+  clickCache[linkId] = (clickCache[linkId] || 0) + 1;
+  pendingDeltas[linkId] = (pendingDeltas[linkId] || 0) + 1;
+
+  // Salvar en disco LOCAL instantáneamente (solo desarrollo)
   saveToLocalDisk();
-  
-  // Guardar checkpoint cada 1000 clicks a GITHUB
-  if (clicksSinceCheckpoint >= CHECKPOINT_INTERVAL) {
-    console.log(`🎯 ${CHECKPOINT_INTERVAL} clicks reached, saving checkpoint...`);
-    await saveCheckpoint();
+
+  if (pendingTotal() >= FLUSH_EVERY) {
+    await flushClicks();
   }
-  
+
   return clickCache[linkId];
+}
+
+/**
+ * Suma los deltas pendientes sobre el valor que hay en GitHub y los persiste.
+ * Si falla, los deltas se conservan para el siguiente intento (no se pierden).
+ */
+export async function flushClicks(): Promise<boolean> {
+  if (pendingTotal() === 0) return true;
+
+  const snapshot = { ...pendingDeltas };
+
+  try {
+    const remote = await loadCheckpointFromGitHub();
+
+    const merged: { [k: string]: number } = {};
+    if (remote) {
+      Object.keys(remote).forEach((k) => {
+        if (k !== 'lastUpdated' && k !== 'totalCheckpoints') {
+          merged[k] = typeof (remote as any)[k] === 'number' ? (remote as any)[k] : 0;
+        }
+      });
+    }
+
+    // Sumar los incrementos locales sobre el remoto
+    Object.keys(snapshot).forEach((k) => {
+      merged[k] = (merged[k] || 0) + snapshot[k];
+    });
+
+    totalCheckpoints++;
+    const ok = await saveCheckpointToGitHub({
+      ...merged,
+      lastUpdated: Date.now(),
+      totalCheckpoints,
+    } as any);
+
+    if (!ok) {
+      console.warn('⚠️ No se pudo guardar el conteo; se reintentará en el próximo lote');
+      return false;
+    }
+
+    // Restar solo lo que efectivamente se persistió (pudo llegar más mientras tanto)
+    Object.keys(snapshot).forEach((k) => {
+      pendingDeltas[k] = (pendingDeltas[k] || 0) - snapshot[k];
+      if (pendingDeltas[k] <= 0) delete pendingDeltas[k];
+    });
+
+    // El total autoritativo es el remoto ya fusionado
+    Object.keys(merged).forEach((k) => {
+      clickCache[k] = merged[k];
+    });
+    saveToLocalDisk();
+
+    return true;
+  } catch (error) {
+    console.error('❌ Error guardando el conteo de vistas:', error);
+    return false;
+  }
 }
 
 export function getClicks(linkId: string): number {
@@ -165,37 +237,20 @@ export async function syncWithGitHub(): Promise<{ [linkId: string]: number }> {
   }
 }
 
+/**
+ * Fuerza el guardado inmediato de lo pendiente (lo usa el botón "Fijar
+ * checkpoint" del admin). El merge con el remoto lo hace flushClicks.
+ */
 export async function saveCheckpoint() {
-  try {
-    totalCheckpoints++;
-    const checkpointData = {
-      ...clickCache,
-      lastUpdated: Date.now(),
-      totalCheckpoints,
-    };
-
-    // Un reintento: los guardados concurrentes pueden chocar por SHA (409)
-    let success = await saveCheckpointToGitHub(checkpointData);
-    if (!success) {
-      success = await saveCheckpointToGitHub({
-        ...clickCache,
-        lastUpdated: Date.now(),
-        totalCheckpoints,
-      });
-    }
-
-    if (success) {
-      clicksSinceCheckpoint = 0;
-      console.log('✅ Checkpoint saved to GitHub');
-    }
-  } catch (error) {
-    console.error('Error saving checkpoint:', error);
-  }
+  const ok = await flushClicks();
+  if (ok) console.log('✅ Checkpoint saved to GitHub');
+  return ok;
 }
 
 export function resetCache() {
   Object.keys(clickCache).forEach(key => delete clickCache[key]);
+  Object.keys(pendingDeltas).forEach(key => delete pendingDeltas[key]);
   lastUsedIndexCache = undefined;
-  clicksSinceCheckpoint = 0;
+  totalCheckpoints = 0;
   saveToLocalDisk();
 }

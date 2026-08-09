@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
@@ -23,6 +23,7 @@ export default function Descargas() {
   const [redirectingId, setRedirectingId] = useState<string | null>(null);
   const [counter, setCounter] = useState(REDIRECT_SECONDS);
   const [blockedFile, setBlockedFile] = useState<FileItem | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -42,10 +43,36 @@ export default function Descargas() {
     fetchFiles();
   }, [router]);
 
+  useEffect(() => {
+    // Al volver del anuncio con el botón atrás, la página se restaura desde
+    // bfcache con el estado anterior: sin esto, redirectingId se queda fijo y
+    // TODOS los botones de descarga permanecen deshabilitados para siempre.
+    const resetPending = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRedirectingId(null);
+      setCounter(REDIRECT_SECONDS);
+    };
+
+    window.addEventListener('pageshow', resetPending);
+    return () => {
+      window.removeEventListener('pageshow', resetPending);
+      // El interval vive fuera de este efecto: si no se limpia al desmontar,
+      // dispara el redirect al anuncio desde cualquier otra página.
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
   const handleDownload = (file: FileItem) => {
     if (redirectingId) return;
 
-    // 1) MediaFire en pestaña nueva (dentro del gesto del usuario)
+    // 1) Registrar la descarga (best-effort, no bloquea) — también en el
+    //    camino de popup bloqueado, para no perder el conteo.
+    axios.post(`/api/download?file=${file.id}`).catch(() => {});
+
+    // 2) MediaFire en pestaña nueva (dentro del gesto del usuario)
     const win = window.open(file.url, '_blank', 'noopener,noreferrer');
     if (!win) {
       // Popup bloqueado: mostrar enlace directo para clic manual
@@ -54,31 +81,36 @@ export default function Descargas() {
     }
     setBlockedFile(null);
 
-    // 2) Registrar descarga (best-effort, no bloquea)
-    axios.post(`/api/download?file=${file.id}`).catch(() => {});
-
-    // 3) Countdown en esta pestaña y redirect al ad
+    // 3) Countdown en esta pestaña y redirect al ad. Deadline real en lugar de
+    //    restar por tick: esta pestaña puede quedar en segundo plano y los
+    //    navegadores ralentizan los timers ahí.
     setRedirectingId(file.id);
-    let remaining = REDIRECT_SECONDS;
-    setCounter(remaining);
+    const deadline = Date.now() + REDIRECT_SECONDS * 1000;
+    setCounter(REDIRECT_SECONDS);
 
-    const interval = setInterval(() => {
-      remaining -= 1;
-      setCounter(remaining);
-      if (remaining <= 0) {
-        clearInterval(interval);
-        axios
-          .get('/api/get-redirect-link')
-          .then((response) => {
-            window.location.href = response.data.url;
-          })
-          .catch(() => {
-            // Si el link de ads falla, no navegar a una URL rota
-            setRedirectingId(null);
-            setCounter(REDIRECT_SECONDS);
-          });
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      const msLeft = deadline - Date.now();
+
+      if (msLeft > 0) {
+        setCounter(Math.ceil(msLeft / 1000));
+        return;
       }
-    }, 1000);
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+
+      axios
+        .get('/api/get-redirect-link')
+        .then((response) => {
+          window.location.href = response.data.url;
+        })
+        .catch(() => {
+          // Si el link de ads falla, no navegar a una URL rota
+          setRedirectingId(null);
+          setCounter(REDIRECT_SECONDS);
+        });
+    }, 250);
   };
 
   return (

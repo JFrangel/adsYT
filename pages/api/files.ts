@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createGitHubService, createGitHubDataService } from '@/lib/github';
-import { verifySession, resolveAdRedirect } from '@/lib/timers';
+import { verifySession, resolveAdRedirect, consumeSession, signSession } from '@/lib/timers';
 
 // Simple memory cache to absorb traffic spikes in serverless
 let manifestCache: any = null;
@@ -20,6 +20,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // El usuario debe haber completado el timer Y la visita al anuncio (7s fuera)
     if (!session || !session.entry1Completed || !resolveAdRedirect(session).adRedirectCompleted) {
       return res.status(401).json({ success: false, error: 'Unauthorized', files: [] });
+    }
+
+    // Marcar la sesión como usada: refrescar /descargas sigue funcionando, pero
+    // al volver a entrar por la home se exigirá repetir el flujo completo.
+    if (!session.consumed) {
+      const consumed = consumeSession(resolveAdRedirect(session));
+      res.setHeader(
+        'Set-Cookie',
+        `user_session=${signSession(consumed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`
+      );
     }
 
     const githubData = createGitHubDataService();

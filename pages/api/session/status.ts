@@ -16,6 +16,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ entry1Completed: false, adCompleted: false });
     }
 
+    // Sesión de un solo uso: si el usuario ya llegó a ver los archivos y vuelve
+    // a entrar por la home, se descarta y debe repetir timer + anuncio.
+    if (session.consumed) {
+      res.setHeader('Set-Cookie', 'user_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+      return res.status(200).json({ entry1Completed: false, adCompleted: false, reset: true });
+    }
+
     const updated = resolveAdRedirect(session);
 
     if (updated.adRedirectCompleted && !session.adRedirectCompleted) {

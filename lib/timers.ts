@@ -7,6 +7,12 @@ export interface SessionProgress {
   entry1Completed: boolean;
   adRedirectStartedAt?: number;
   adRedirectCompleted?: boolean;
+  /**
+   * true una vez que el usuario ya llegó a ver la lista de archivos.
+   * El desbloqueo se conserva (para que refrescar /descargas no lo expulse),
+   * pero al volver a entrar por la home la sesión se descarta y repite el flujo.
+   */
+  consumed?: boolean;
 }
 
 /** Tiempo mínimo (ms) que el usuario debe permanecer fuera, en el anuncio. */
@@ -26,6 +32,11 @@ export function completeEntry1(session: SessionProgress): SessionProgress {
 /** Sella el momento en que el usuario salió hacia el anuncio. */
 export function startAdRedirect(session: SessionProgress): SessionProgress {
   return { ...session, adRedirectStartedAt: Date.now(), adRedirectCompleted: false };
+}
+
+/** Marca la sesión como ya usada (el usuario llegó a la lista de archivos). */
+export function consumeSession(session: SessionProgress): SessionProgress {
+  return { ...session, consumed: true };
 }
 
 /**

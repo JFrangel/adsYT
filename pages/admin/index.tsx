@@ -432,7 +432,7 @@ export default function AdminPanel() {
       <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 relative overflow-hidden">
         <div className="max-w-6xl mx-auto relative z-10">
           {/* Header */}
-          <div className="card mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+          <div className="card mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 fade-in">
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-1 flex items-center gap-3">
                 <AdminIcon className="w-7 h-7 text-zinc-400" />
@@ -497,8 +497,8 @@ export default function AdminPanel() {
           </div>
 
           {/* Files List */}
-          <div className="card animate-fade-in" style={{animationDelay: '0.4s'}}>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
+          <div className="card fade-in">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
               <FolderIcon className="w-7 h-7 sm:w-8 sm:h-8" />
               Enlaces publicados
             </h2>
@@ -511,7 +511,7 @@ export default function AdminPanel() {
                 </div>
               </div>
             ) : files.length === 0 ? (
-              <div className="text-center py-12 sm:py-16 glass-card">
+              <div className="text-center py-12 row-item">
                 <p className="text-lg text-zinc-400">No hay enlaces todavía</p>
               </div>
             ) : (
@@ -552,8 +552,8 @@ export default function AdminPanel() {
           </div>
 
           {/* Direct Links Section */}
-          <div className="card mt-8 animate-fade-in">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-6 gradient-text flex items-center gap-3">
+          <div className="card mt-8 fade-in">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
@@ -614,8 +614,8 @@ export default function AdminPanel() {
               <div className="mt-4 p-3 bg-black/20 rounded-lg border border-white/10">
                 <p className="text-xs text-zinc-400 leading-relaxed">
                   {linksMode === 'single' 
-                    ? 'El link marcado como "Activo" será el único usado en el Paso 2. Los links deshabilitados no se mostrarán.' 
-                    : 'Todos los links habilitados se alternarán automáticamente en cada visita al Paso 2. El usuario verá el sistema como un solo link.'}
+                    ? 'El link marcado como "Activo" será el único que se muestre a los usuarios. Los links deshabilitados no se usarán.' 
+                    : 'Todos los links habilitados se alternarán automáticamente en cada visita. El usuario verá el sistema como un solo link.'}
                 </p>
               </div>
             </div>
@@ -704,7 +704,7 @@ export default function AdminPanel() {
             {/* Links List */}
             <div className="space-y-4">
               {links.length === 0 ? (
-                <div className="text-center py-12 glass-card">
+                <div className="text-center py-12 row-item">
                   <svg className="w-16 h-16 mx-auto mb-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
@@ -800,7 +800,7 @@ export default function AdminPanel() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                               )}
                             </svg>
-                            {link.enabled ? 'Habilitar' : 'Pausar'}
+                            {link.enabled ? 'Pausar' : 'Habilitar'}
                           </button>
                           <button
                             onClick={() => editLink(link.id, link.name, link.url)}

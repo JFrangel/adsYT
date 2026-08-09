@@ -51,7 +51,7 @@ export const DownloadIcon = ({ className = 'w-8 h-8', animate = false }: IconPro
     fill="currentColor"
     className={`${className} ${animate ? 'animate-bounce' : ''}`}
   >
-    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+    <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z" />
   </svg>
 );
 

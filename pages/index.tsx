@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
@@ -12,33 +12,54 @@ import { FireIcon, ArrowIcon, LockIcon, AnnouncementIcon, CheckIcon } from '@/co
 // 'ready'   → visita al anuncio validada; puede continuar a descargas
 type Stage = 'locked' | 'ad' | 'ready';
 
+// Debe coincidir con AD_REDIRECT_MS del servidor (lib/timers.ts).
+// El servidor es la autoridad; esto solo controla el cierre automático.
+const AD_SECONDS = 7;
+
 export default function Home() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>('locked');
   const [checking, setChecking] = useState(true);
   const [leaving, setLeaving] = useState(false);
   const [adHint, setAdHint] = useState<string | null>(null);
+  const [adCountdown, setAdCountdown] = useState<number | null>(null);
+  const statusSeq = useRef(0);
+  const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshStatus = useCallback(async () => {
+    // Descarta respuestas obsoletas: pageshow y focus pueden disparar dos
+    // consultas casi a la vez y la última en resolver no es la más reciente.
+    const seq = ++statusSeq.current;
+
     try {
       const response = await axios.get('/api/session/status');
+      if (seq !== statusSeq.current) return;
+
       const { entry1Completed, adCompleted, remainingMs } = response.data;
+
+      // Al volver del anuncio la página puede restaurarse desde bfcache con el
+      // estado React anterior: hay que soltar los flags de "en curso".
+      setLeaving(false);
+      setAdCountdown(null);
 
       if (adCompleted) {
         setStage('ready');
         setAdHint(null);
       } else if (entry1Completed) {
         setStage('ad');
-        if (remainingMs > 0) {
-          setAdHint('Debes permanecer unos segundos más en el anuncio. Inténtalo de nuevo.');
-        }
+        setAdHint(
+          remainingMs > 0
+            ? 'Debes permanecer unos segundos más en el anuncio. Inténtalo de nuevo.'
+            : null
+        );
       } else {
         setStage('locked');
+        setAdHint(null);
       }
     } catch {
       // Sin red no bloqueamos la UI: se queda en la etapa actual
     } finally {
-      setChecking(false);
+      if (seq === statusSeq.current) setChecking(false);
     }
   }, []);
 
@@ -54,30 +75,83 @@ export default function Home() {
     return () => {
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('focus', onFocus);
+      if (adTimerRef.current) clearInterval(adTimerRef.current);
     };
   }, [refreshStatus]);
 
   const handleTimerComplete = async () => {
     try {
-      await fetch('/api/session/start', { method: 'POST' });
+      const response = await fetch('/api/session/start', { method: 'POST' });
+      // fetch NO lanza en 4xx/5xx: sin este chequeo la UI avanzaría a 'ad'
+      // sin cookie de sesión y el usuario quedaría atrapado en 401.
+      if (!response.ok) throw new Error(`start devolvió ${response.status}`);
+      setStage('ad');
     } catch (error) {
       console.error('No se pudo iniciar la sesión', error);
+      setAdHint('No se pudo iniciar la sesión. Recarga la página e inténtalo de nuevo.');
     }
-    setStage('ad');
   };
 
   const handleVisitAd = async () => {
     if (leaving) return;
+
+    // Se abre SINCRÓNICAMENTE dentro del clic para que el navegador lo trate
+    // como gesto del usuario. Si devuelve null (bloqueador de popups, común en
+    // móvil), caemos al redirect en la misma pestaña y el usuario vuelve con
+    // el botón atrás: pageshow/focus revalidan el estado igual.
+    const adWindow = window.open('', '_blank');
+
     setLeaving(true);
     setAdHint(null);
+
     try {
-      // 1) Sellar la salida en la cookie (server-side)
+      // 1) Sellar la salida en la cookie (server-side, es la autoridad de los 7s)
       await axios.post('/api/session/ad-visit');
-      // 2) Obtener el link del anuncio y salir en esta misma pestaña
+      // 2) Obtener el link del anuncio
       const response = await axios.get('/api/get-redirect-link');
-      window.location.href = response.data.url;
+      const adUrl = response.data.url;
+
+      if (!adWindow) {
+        // Fallback universal: misma pestaña, regreso manual con atrás.
+        window.location.href = adUrl;
+        return;
+      }
+
+      adWindow.location.href = adUrl;
+
+      // 3) Cierre automático a los 7s. Se calcula contra un DEADLINE real y no
+      //    restando 1 por tick: nuestra pestaña queda en segundo plano y los
+      //    navegadores ralentizan los timers ahí, lo que desfasaría la cuenta.
+      const deadline = Date.now() + AD_SECONDS * 1000;
+      setAdCountdown(AD_SECONDS);
+
+      if (adTimerRef.current) clearInterval(adTimerRef.current);
+      adTimerRef.current = setInterval(() => {
+        const msLeft = deadline - Date.now();
+
+        if (msLeft > 0) {
+          setAdCountdown(Math.ceil(msLeft / 1000));
+          return;
+        }
+
+        if (adTimerRef.current) clearInterval(adTimerRef.current);
+        adTimerRef.current = null;
+        try {
+          adWindow.close();
+        } catch {
+          // Si el navegador no permite cerrarla (algunos móviles), el usuario
+          // vuelve con atrás y pageshow/focus revalidan el estado.
+        }
+        setAdCountdown(null);
+        setLeaving(false);
+        refreshStatus();
+      }, 250);
     } catch (error) {
       console.error('No se pudo abrir el anuncio', error);
+      try {
+        adWindow?.close();
+      } catch {}
+      setAdCountdown(null);
       setAdHint('No se pudo abrir el anuncio. Inténtalo de nuevo.');
       setLeaving(false);
     }
@@ -119,14 +193,28 @@ export default function Home() {
 
             {!checking && stage === 'ad' && (
               <div className="flex flex-col items-center gap-4 w-full fade-in">
-                <button onClick={handleVisitAd} disabled={leaving} className="btn-primary w-full text-lg">
-                  <AnnouncementIcon className="w-5 h-5" />
-                  {leaving ? 'Abriendo anuncio…' : 'Ver anuncio'}
-                </button>
-                <p className="text-sm text-zinc-500">
-                  Permanece unos <span className="text-zinc-300 font-medium">7 segundos</span> en el
-                  anuncio y regresa con el botón atrás.
-                </p>
+                {adCountdown !== null ? (
+                  <div className="flex flex-col items-center gap-3 w-full fade-in">
+                    <div className="w-16 h-16 rounded-full border border-primary/30 bg-primary/5 flex items-center justify-center">
+                      <span className="text-2xl font-semibold tabular-nums text-primary">{adCountdown}</span>
+                    </div>
+                    <p className="text-sm text-zinc-500 text-center">
+                      Viendo el anuncio… te regresaremos automáticamente.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <button onClick={handleVisitAd} disabled={leaving} className="btn-primary w-full text-lg">
+                      <AnnouncementIcon className="w-5 h-5" />
+                      {leaving ? 'Abriendo anuncio…' : 'Ver anuncio'}
+                    </button>
+                    <p className="text-sm text-zinc-500">
+                      Se abrirá un anuncio durante{' '}
+                      <span className="text-zinc-300 font-medium">7 segundos</span> y volverás
+                      automáticamente para continuar.
+                    </p>
+                  </>
+                )}
                 {adHint && (
                   <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 fade-in">
                     {adHint}

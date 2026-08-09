@@ -7,6 +7,7 @@ import {
   verifySession,
   startAdRedirect,
   resolveAdRedirect,
+  consumeSession,
   AD_REDIRECT_MS,
 } from '@/lib/timers';
 
@@ -71,5 +72,28 @@ describe('redirect al anuncio (7s fuera)', () => {
     const s = resolveAdRedirect({ ...base, adRedirectStartedAt: Date.now() - 8000 });
     const decoded = verifySession(signSession(s));
     expect(decoded!.adRedirectCompleted).toBe(true);
+  });
+});
+
+describe('sesión de un solo uso', () => {
+  const completedSession = () => {
+    const base = startAdRedirect(completeEntry1(createSession()));
+    return resolveAdRedirect({ ...base, adRedirectStartedAt: Date.now() - 8000 });
+  };
+
+  it('una sesión nueva no está consumida', () => {
+    expect(createSession().consumed).toBeFalsy();
+  });
+
+  it('consumeSession la marca sin perder el desbloqueo (refresh sigue funcionando)', () => {
+    const s = consumeSession(completedSession());
+    expect(s.consumed).toBe(true);
+    expect(s.adRedirectCompleted).toBe(true);
+    expect(s.entry1Completed).toBe(true);
+  });
+
+  it('la marca de consumida sobrevive el round-trip de firma', () => {
+    const decoded = verifySession(signSession(consumeSession(completedSession())));
+    expect(decoded!.consumed).toBe(true);
   });
 });
