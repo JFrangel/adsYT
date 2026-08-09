@@ -1,0 +1,15 @@
+{
+  "mode": "single",
+  "links": [
+    {
+      "id": "monetag",
+      "name": "Monetag",
+      "url": "https://omg10.com/4/9722913",
+      "clicks": 0,
+      "enabled": true,
+      "active": true,
+      "createdAt": 1708000000000,
+      "updatedAt": 1774117220733
+    }
+  ]
+}

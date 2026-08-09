@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+  }
+  
+  html {
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    background-color: #0F0F13;
+  }
+  
+  body {
+    @apply bg-dark-900 text-white font-sans;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    position: relative;
+    /* Premium Grid Background */
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(255, 107, 53, 0.15) 0%, transparent 50%),
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    background-position: center top, center center, center center;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-primary to-orange-500 text-white font-bold rounded-xl 
+           transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg 
+           hover:shadow-primary/30 hover:shadow-2xl hover:-translate-y-1 transform text-center flex items-center justify-center gap-2;
+  }
+  
+  .btn-secondary {
+    @apply px-6 sm:px-8 py-3 sm:py-4 bg-dark-700 text-white font-bold rounded-xl border border-white/10
+           hover:bg-dark-800 hover:border-white/20 transition-all duration-300 shadow-lg 
+           hover:shadow-xl hover:-translate-y-1 transform text-center flex items-center justify-center gap-2;
+  }
+  
+  .card {
+    @apply bg-dark-800/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 lg:p-10 border border-white/5 relative overflow-hidden;
+  }
+  
+  .glass-card {
+    @apply bg-dark-700/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 lg:p-8 border border-white/5 transition-colors hover:bg-dark-700/80;
+  }
+
+  .skeleton {
+    @apply bg-gradient-to-r from-dark-700 via-dark-800 to-dark-700 bg-[length:400%_100%] animate-shimmer rounded-xl;
+  }
+  
+  .ad-container {
+    @apply border border-white/10 rounded-2xl p-6 bg-dark-800 text-center min-h-[200px] flex flex-col items-center justify-center shadow-inner relative overflow-hidden;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent;
+  }
+  
+  .glow {
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.4), 0 0 40px rgba(255, 184, 0, 0.2);
+  }
+}
