@@ -5,13 +5,14 @@ import axios from 'axios';
 import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, DownloadIcon, LoadingSpinner } from '@/components/Icons';
 import { AlertDialog, ConfirmDialog, PromptDialog } from '@/components/Dialog';
 import { useDialog } from '@/hooks/useDialog';
+import { isValidMediafireUrl } from '@/lib/mediafire';
 
 interface FileItem {
   id: string;
   name: string;
-  filename: string;
-  size: number;
-  uploadedAt: string;
+  url: string;
+  size?: string;
+  createdAt: string;
   downloads: number;
   visible: boolean;
 }
@@ -29,8 +30,11 @@ export default function AdminPanel() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [linkName, setLinkName] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkSize, setLinkSize] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [links, setLinks] = useState<LinkConfig[]>([]);
@@ -330,99 +334,44 @@ export default function AdminPanel() {
     }
   };
 
-  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddLink = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    const form = e.currentTarget as HTMLFormElement;
-    const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
-    const nameInput = form.querySelector('input[name="name"]') as HTMLInputElement;
-    
-    // Validate inputs
-    if (!nameInput.value.trim()) {
-      showAlert('Error', 'Por favor ingresa un nombre para el archivo', 'error');
-      return;
-    }
-    
-    if (!fileInput.files || fileInput.files.length === 0) {
-      showAlert('Error', 'Por favor selecciona un archivo', 'error');
-      return;
-    }
-    
-    const file = fileInput.files[0];
-    
-    console.log('📄 File validation:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified,
-    });
-    
-    if (file.size === 0) {
-      showAlert('Error', 'El archivo está vacío, selecciona un archivo válido', 'error');
-      return;
-    }
-    
-    // Additional validation: read first bytes to ensure file has content
-    try {
-      const buffer = await file.slice(0, 100).arrayBuffer();
-      const view = new Uint8Array(buffer);
-      console.log('✅ File content verified:', {
-        firstBytes: Array.from(view.slice(0, 20)).join(','),
-        hasContent: view.length > 0,
-      });
-    } catch (readError) {
-      console.error('❌ Could not read file:', readError);
-      showAlert('Error', 'No se pudo leer el archivo, intenta con otro archivo', 'error');
-      return;
-    }
-    
-    setUploading(true);
-    setUploadError(null);
-    const formData = new FormData(form);
+    setLinkError(null);
 
+    if (!linkName.trim()) {
+      setLinkError('Ingresa un nombre para el archivo');
+      return;
+    }
+    if (!isValidMediafireUrl(linkUrl)) {
+      setLinkError('El enlace debe ser de mediafire.com (https)');
+      return;
+    }
+
+    setSavingLink(true);
     try {
-      console.log('📤 Uploading file via FormData:', { 
-        name: file.name, 
-        size: file.size,
-        formDataSize: JSON.stringify(Array.from(formData.entries())).length,
+      await axios.post('/api/admin/files', {
+        name: linkName.trim(),
+        url: linkUrl.trim(),
+        size: linkSize.trim() || undefined,
       });
-      
-      const uploadResponse = await axios.post('/api/admin/files', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      });
-      
-      console.log('✅ Upload successful:', uploadResponse.data);
-      showAlert('Archivo Subido', 'Archivo subido correctamente', 'success');
+      showAlert('Enlace agregado', 'El archivo ya está disponible en la página de descargas', 'success');
+      setLinkName('');
+      setLinkUrl('');
+      setLinkSize('');
       fetchFiles();
-      form.reset();
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || error.message;
-      console.error('❌ Upload failed:', {
-        message: errorMsg,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
-
-      // Show inline error for extension/mimetype issues with clearer message
-      if (error.response?.status === 400 && /extensi/i.test(String(errorMsg))) {
-        const friendly = 'El archivo debe incluir una extensión válida (ej. .pdf, .png). Cambia el nombre o selecciona un archivo con tipo reconocido.';
-        setUploadError(friendly);
-        showAlert('Error', friendly, 'error');
-      } else {
-        setUploadError(String(errorMsg));
-        showAlert('Error', 'Error al subir archivo: ' + errorMsg, 'error');
-      }
+      setLinkError(errorMsg);
+      showAlert('Error', 'No se pudo agregar el enlace: ' + errorMsg, 'error');
     } finally {
-      setUploading(false);
+      setSavingLink(false);
     }
   };
 
-  const handleDelete = (fileId: string, filename: string) => {
+  const handleDelete = (fileId: string, name: string) => {
     showConfirm(
-      'Eliminar Archivo',
-      `¿Eliminar ${filename}?\n\nEsta acción no se puede deshacer.`,
+      'Eliminar enlace',
+      `¿Eliminar "${name}"?\n\nEl archivo seguirá existiendo en MediaFire; solo se quita de la página.`,
       async () => {
         try {
           await axios.delete(`/api/admin/files?file=${fileId}`);
@@ -440,22 +389,12 @@ export default function AdminPanel() {
     );
   };
 
-  const handleAdminDownload = async (file: FileItem) => {
+  const handleCopyLink = async (file: FileItem) => {
     try {
-      console.log('Admin download started for:', file.filename);
-      
-      const downloadUrl = `/api/download?file=${file.id}`;
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = file.filename || 'archivo';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      showAlert('Descarga', `Iniciada la descarga de ${file.name}`, 'success');
-    } catch (err: any) {
-      console.error('Admin download error:', err);
-      showAlert('Error', 'Error al iniciar la descarga del archivo', 'error');
+      await navigator.clipboard.writeText(file.url);
+      showAlert('Enlace copiado', file.url, 'success');
+    } catch {
+      showAlert('Error', 'No se pudo copiar el enlace', 'error');
     }
   };
 
@@ -476,8 +415,8 @@ export default function AdminPanel() {
         </Head>
         <div className="min-h-[100dvh] flex items-center justify-center">
           <div className="relative">
-            <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
-            <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping"></div>
+            <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-primary border-t-transparent"></div>
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
           </div>
         </div>
       </>
@@ -491,21 +430,15 @@ export default function AdminPanel() {
       </Head>
       
       <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-20 w-48 sm:w-72 lg:w-96 h-48 sm:h-72 lg:h-96 bg-purple-500/20 rounded-full blur-3xl animate-float"></div>
-          <div className="absolute bottom-20 right-20 w-40 sm:w-60 lg:w-80 h-40 sm:h-60 lg:h-80 bg-pink-500/20 rounded-full blur-3xl animate-float" style={{animationDelay: '1s'}}></div>
-        </div>
-        
         <div className="max-w-6xl mx-auto relative z-10">
           {/* Header */}
           <div className="card mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
             <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-2 flex items-center gap-2">
-                <AdminIcon className="w-8 h-8 sm:w-10 sm:h-10 text-purple-400" animate />
-                <span className="gradient-text">Panel Admin</span>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-1 flex items-center gap-3">
+                <AdminIcon className="w-7 h-7 text-zinc-400" />
+                Panel Admin
               </h1>
-              <p className="text-purple-200 text-base sm:text-lg">Gestión de archivos y contenido</p>
+              <p className="text-zinc-400 text-base sm:text-lg">Gestión de archivos y contenido</p>
             </div>
             <button onClick={handleLogout} className="btn-secondary w-full sm:w-auto text-base sm:text-lg flex items-center justify-center gap-2">
               <LogoutIcon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -513,56 +446,52 @@ export default function AdminPanel() {
             </button>
           </div>
 
-          {/* Upload Form */}
-          <div className="card mb-6 sm:mb-8 animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
-              <UploadIcon className="w-7 h-7 sm:w-8 sm:h-8" />
-              Subir Nuevo Archivo
-            </h2>
-            <form onSubmit={handleUpload} className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* Formulario de enlace MediaFire */}
+          <div className="card mb-6 fade-in">
+            <h2 className="text-xl font-semibold text-white mb-1">Agregar archivo</h2>
+            <p className="text-sm text-zinc-500 mb-6">
+              Sube tu archivo a MediaFire y pega aquí el enlace para compartirlo.
+            </p>
+            <form onSubmit={handleAddLink} className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs sm:text-sm font-bold text-purple-200 mb-2 sm:mb-3">
-                    Nombre para mostrar
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">Nombre visible</label>
+                  <input
+                    type="text"
+                    value={linkName}
+                    onChange={(e) => setLinkName(e.target.value)}
+                    required
+                    className="input-field"
+                    placeholder="Ej: Sensibilidad Pro 2026"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">
+                    Peso <span className="text-zinc-600">(opcional)</span>
                   </label>
                   <input
                     type="text"
-                    name="name"
-                    required
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-white/10 border-2 border-white/20 rounded-xl 
-                              text-white placeholder-purple-300/50 text-sm sm:text-base
-                              focus:ring-2 focus:ring-purple-500 focus:border-transparent 
-                              transition-all backdrop-blur-sm"
-                    placeholder="Ej: Recursos Free Fire v1.0"
+                    value={linkSize}
+                    onChange={(e) => setLinkSize(e.target.value)}
+                    className="input-field"
+                    placeholder="Ej: 48 MB"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-purple-200 mb-2 sm:mb-3">
-                    Archivo
-                  </label>
-                  <input
-                    type="file"
-                    name="file"
-                    required
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-white/10 border-2 border-white/20 rounded-xl 
-                              text-white text-sm sm:text-base file:mr-4 file:py-2 file:px-4
-                              file:rounded-lg file:border-0
-                              file:bg-purple-500 file:text-white
-                              hover:file:bg-purple-600 file:cursor-pointer
-                              transition-all backdrop-blur-sm"
-                  />
-                  {uploadError && (
-                    <p className="mt-2 text-sm text-red-400">{uploadError}</p>
-                  )}
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={uploading}
-                className="btn-primary text-base sm:text-lg w-full sm:w-auto flex items-center justify-center gap-2"
-              >
-                <UploadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                {uploading ? 'Subiendo...' : 'Subir Archivo'}
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Enlace de MediaFire</label>
+                <input
+                  type="url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  required
+                  className="input-field"
+                  placeholder="https://www.mediafire.com/file/…"
+                />
+                {linkError && <p className="mt-2 text-sm text-red-400 fade-in">{linkError}</p>}
+              </div>
+              <button type="submit" disabled={savingLink} className="btn-primary self-start">
+                {savingLink ? 'Guardando…' : 'Agregar enlace'}
               </button>
             </form>
           </div>
@@ -571,57 +500,47 @@ export default function AdminPanel() {
           <div className="card animate-fade-in" style={{animationDelay: '0.4s'}}>
             <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 gradient-text flex items-center gap-2">
               <FolderIcon className="w-7 h-7 sm:w-8 sm:h-8" />
-              Archivos Actuales
+              Enlaces publicados
             </h2>
             
             {loading ? (
               <div className="text-center py-12 sm:py-16">
                 <div className="relative inline-block">
-                  <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
-                  <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-primary border-t-transparent"></div>
+                  <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping"></div>
                 </div>
               </div>
             ) : files.length === 0 ? (
               <div className="text-center py-12 sm:py-16 glass-card">
-                <p className="text-lg sm:text-xl text-purple-200">No hay archivos subidos</p>
+                <p className="text-lg text-zinc-400">No hay enlaces todavía</p>
               </div>
             ) : (
-              <div className="space-y-3 sm:space-y-4">
-                {files.map((file, index) => (
-                  <div 
-                    key={file.id} 
-                    className="glass-card hover:bg-white/10 transition-all duration-300 group animate-fade-in"
-                    style={{animationDelay: `${0.1 * index}s`}}
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg sm:text-xl text-white mb-2 flex items-center gap-2">
-                          <FileIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                          {file.name}
+              <div className="flex flex-col gap-3">
+                {files.map((file) => (
+                  <div key={file.id} className="row-item">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-white flex items-center gap-2">
+                          <FileIcon className="w-4 h-4 text-zinc-500 shrink-0" />
+                          <span className="truncate">{file.name}</span>
                         </h3>
-                        <p className="text-xs sm:text-sm text-purple-300">
-                          {file.filename} • {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.downloads} descargas
-                        </p>
-                        <p className="text-xs text-purple-400/80 mt-1">
-                          Subido: {new Date(file.uploadedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        <p className="text-sm text-zinc-500 mt-1 truncate">{file.url}</p>
+                        <p className="text-xs text-zinc-600 mt-1">
+                          {file.size ? `${file.size} · ` : ''}
+                          {file.downloads} descargas ·{' '}
+                          {new Date(file.createdAt).toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
                         </p>
                       </div>
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <button
-                          onClick={() => handleAdminDownload(file)}
-                          className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base"
-                        >
-                          <DownloadIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                          Descargar
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => handleCopyLink(file)} className="btn-secondary text-sm px-4 py-2.5">
+                          Copiar enlace
                         </button>
-
-                        <button
-                          onClick={() => handleDelete(file.id, file.filename)}
-                          className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-xl 
-                                    hover:from-red-600 hover:to-pink-700 transition-all duration-300
-                                    shadow-xl hover:shadow-2xl hover:scale-105 transform text-sm sm:text-base flex items-center justify-center gap-2"
-                        >
-                          <DeleteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <button onClick={() => handleDelete(file.id, file.name)} className="btn-danger">
+                          <DeleteIcon className="w-4 h-4" />
                           Eliminar
                         </button>
                       </div>
@@ -642,11 +561,11 @@ export default function AdminPanel() {
             </h2>
 
             {/* Mode Selection */}
-            <div className="mb-6 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border border-purple-500/30 rounded-xl p-5 shadow-xl">
+            <div className="mb-6 bg-gradient-to-br from-dark-800 to-dark-800 border border-white/10 rounded-xl p-5 shadow-xl">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-base font-bold text-white mb-1">Modo de Operación</p>
-                  <p className="text-xs text-purple-300">
+                  <p className="text-xs text-zinc-400">
                     {linksMode === 'single' 
                       ? 'Solo un link estará en uso' 
                       : 'Sistema de rotación A/B activo'}
@@ -655,7 +574,7 @@ export default function AdminPanel() {
                 <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${
                   linksMode === 'alternate' 
                     ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/50 text-green-300'
-                    : 'bg-purple-500/20 border border-purple-500/50 text-purple-300'
+                    : 'bg-white/5 border border-white/15 text-zinc-400'
                 }`}>
                   {linksMode === 'alternate' ? 'ROTACIÓN ACTIVA' : 'MODO ÚNICO'}
                 </div>
@@ -665,8 +584,8 @@ export default function AdminPanel() {
                   onClick={() => updateLinkMode('single')}
                   className={`flex-1 min-w-[140px] px-5 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
                     linksMode === 'single'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/50'
-                      : 'bg-white/5 text-purple-200 hover:bg-white/10 border border-white/10'
+                      ? 'bg-gradient-to-r from-primary to-primary text-white shadow-lg shadow-black/40'
+                      : 'bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-center gap-2">
@@ -681,7 +600,7 @@ export default function AdminPanel() {
                   className={`flex-1 min-w-[140px] px-5 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
                     linksMode === 'alternate'
                       ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/50'
-                      : 'bg-white/5 text-purple-200 hover:bg-white/10 border border-white/10'
+                      : 'bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-center gap-2">
@@ -692,8 +611,8 @@ export default function AdminPanel() {
                   </div>
                 </button>
               </div>
-              <div className="mt-4 p-3 bg-black/20 rounded-lg border border-purple-500/20">
-                <p className="text-xs text-purple-200 leading-relaxed">
+              <div className="mt-4 p-3 bg-black/20 rounded-lg border border-white/10">
+                <p className="text-xs text-zinc-400 leading-relaxed">
                   {linksMode === 'single' 
                     ? 'El link marcado como "Activo" será el único usado en el Paso 2. Los links deshabilitados no se mostrarán.' 
                     : 'Todos los links habilitados se alternarán automáticamente en cada visita al Paso 2. El usuario verá el sistema como un solo link.'}
@@ -704,7 +623,7 @@ export default function AdminPanel() {
             {/* Herramientas de Administracion y Mantenimiento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {/* Gestión de Monetización */}
-              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-purple-500/20 shadow-inner">
+              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-white/10 shadow-inner">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
                   <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -726,7 +645,7 @@ export default function AdminPanel() {
                     <button
                       onClick={refreshClicks}
                       disabled={refreshingClicks}
-                      className="w-full px-3 py-2.5 rounded-lg font-bold text-xs bg-purple-500/20 text-purple-200 hover:bg-purple-500/40 border border-purple-500/30 transition-all flex justify-center items-center gap-1 disabled:opacity-50"
+                      className="w-full px-3 py-2.5 rounded-lg font-bold text-xs bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10 transition-all flex justify-center items-center gap-1 disabled:opacity-50"
                     >
                       <svg className={`w-4 h-4 ${refreshingClicks ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -748,7 +667,7 @@ export default function AdminPanel() {
               </div>
 
               {/* Herramientas del Sistema */}
-              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-purple-500/20 shadow-inner">
+              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-white/10 shadow-inner">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
                   <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -786,11 +705,11 @@ export default function AdminPanel() {
             <div className="space-y-4">
               {links.length === 0 ? (
                 <div className="text-center py-12 glass-card">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-purple-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
-                  <p className="text-lg text-purple-300 font-semibold">No hay links configurados</p>
-                  <p className="text-xs text-purple-400 mt-2">Agrega un link para comenzar con la monetización</p>
+                  <p className="text-lg text-zinc-400 font-semibold">No hay links configurados</p>
+                  <p className="text-xs text-zinc-500 mt-2">Agrega un link para comenzar con la monetización</p>
                 </div>
               ) : (
                 links.map((link, index) => {
@@ -798,7 +717,7 @@ export default function AdminPanel() {
                   const isActiveInSingle = linksMode === 'single' && link.active;
                   
                   return (
-                    <div key={link.id} className="bg-gradient-to-br from-white/5 to-white/10 border border-white/20 rounded-xl p-5 hover:border-purple-500/50 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    <div key={link.id} className="bg-gradient-to-br from-white/5 to-white/10 border border-white/20 rounded-xl p-5 hover:border-white/15 transition-all duration-300 shadow-lg hover:shadow-xl">
                       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                         <div className="flex-1 w-full">
                           <div className="flex items-start justify-between gap-3 mb-3">
@@ -816,7 +735,7 @@ export default function AdminPanel() {
                                     </span>
                                   )}
                                   {isActiveInSingle && (
-                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/50 text-purple-300 flex items-center gap-1">
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-dark-700 to-dark-700 border border-white/15 text-zinc-400 flex items-center gap-1">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                       </svg>
@@ -833,7 +752,7 @@ export default function AdminPanel() {
                                   )}
                                 </div>
                               </div>
-                              <p className="text-xs text-purple-300/80 break-all font-mono bg-black/20 px-3 py-1.5 rounded-lg border border-purple-500/10">
+                              <p className="text-xs text-zinc-500 break-all font-mono bg-black/20 px-3 py-1.5 rounded-lg border border-white/[0.06]">
                                 {link.url}
                               </p>
                             </div>
@@ -845,7 +764,7 @@ export default function AdminPanel() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                               <span className="text-yellow-300 font-semibold">{link.clicks}</span>
-                              <span className="text-purple-300/70">clicks</span>
+                              <span className="text-zinc-400/70">clicks</span>
                             </div>
                           </div>
                         </div>
@@ -856,8 +775,8 @@ export default function AdminPanel() {
                               disabled={link.active}
                               className={`px-4 py-2.5 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
                                 link.active
-                                  ? 'bg-purple-600 text-white cursor-default shadow-lg shadow-purple-500/30'
-                                  : 'bg-white/5 text-purple-300 hover:bg-purple-600/20 border border-white/10'
+                                  ? 'bg-primary text-white cursor-default shadow-lg shadow-black/40'
+                                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10'
                               }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -885,7 +804,7 @@ export default function AdminPanel() {
                           </button>
                           <button
                             onClick={() => editLink(link.id, link.name, link.url)}
-                            className="px-4 py-2.5 rounded-lg font-bold text-xs bg-white/5 text-purple-300 hover:bg-purple-600/20 border border-white/10 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                            className="px-4 py-2.5 rounded-lg font-bold text-xs bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -935,14 +854,14 @@ export default function AdminPanel() {
                     {links.filter(l => l.enabled).length} / {links.length}
                   </p>
                 </div>
-                <div className="bg-gradient-to-br from-purple-600/20 to-indigo-600/20 border border-purple-500/30 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
+                <div className="bg-gradient-to-br from-dark-700 to-dark-700 border border-white/10 rounded-xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
-                    <p className="text-sm font-semibold text-purple-200">Sistema</p>
+                    <p className="text-sm font-semibold text-zinc-400">Sistema</p>
                   </div>
-                  <p className="text-lg font-bold text-purple-300">
+                  <p className="text-lg font-bold text-zinc-400">
                     {linksMode === 'alternate' ? 'Rotación A/B' : 'Modo Único'}
                   </p>
                 </div>
