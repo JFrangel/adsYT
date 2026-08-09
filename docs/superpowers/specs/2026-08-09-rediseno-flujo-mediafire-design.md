@@ -25,14 +25,28 @@ ninguna ruta que mueva binarios → el límite de 6MB deja de ser relevante.
 
 ## Nuevo flujo de usuario
 
+> **Actualizado durante la ejecución por pedido del usuario:** entre el timer y las
+> descargas se reintrodujo una visita al anuncio en la misma pestaña, con permanencia
+> mínima de 7 segundos validada server-side (sello de tiempo firmado en la cookie).
+
 ```
-/  (Paso 1)                    /descargas (Paso 2)              Clic en "Descargar"
-┌─────────────────┐           ┌─────────────────────┐          ┌──────────────────────────┐
-│ Timer 8s + ad   │  ──────>  │ Lista de archivos   │  ─────>  │ Pestaña nueva: MediaFire │
-│ en página       │  cookie   │ (enlaces MediaFire) │          │ Pestaña actual: countdown│
-│                 │  sesión   │                     │          │ 8s → redirect a Monetag  │
-└─────────────────┘           └─────────────────────┘          └──────────────────────────┘
+/  (Paso 1)                           /descargas (Paso 2)          Clic en "Descargar"
+┌──────────────────────────┐         ┌─────────────────────┐      ┌──────────────────────────┐
+│ 1. Timer 8s              │         │ Lista de archivos   │      │ Pestaña nueva: MediaFire │
+│ 2. "Ver anuncio" →       │  ─────> │ (enlaces MediaFire) │ ───> │ Pestaña actual: countdown│
+│    redirect misma pestaña│  cookie │                     │      │ 8s → redirect a Monetag  │
+│ 3. 7s fuera (validado    │  sesión │                     │      └──────────────────────────┘
+│    server-side) → volver │         └─────────────────────┘
+│ 4. "Continuar" ✓         │
+└──────────────────────────┘
 ```
+
+- Endpoints de sesión: `POST /api/session/start` (timer), `POST /api/session/ad-visit`
+  (sella la salida al anuncio), `GET /api/session/status` (resuelve si ya pasaron los
+  7s y re-firma la cookie). `GET /api/files` exige `entry1Completed` **y**
+  `adRedirectCompleted`.
+- Al volver del anuncio (botón atrás), la home re-consulta el status en `pageshow`/
+  `focus` para cubrir restauraciones desde bfcache.
 
 - Comportamiento al descargar (confirmado): **2 pestañas** — MediaFire se abre en una
   pestaña nueva; la pestaña actual muestra un countdown de **8s** (igual que el flujo anterior, decidido por el usuario) y luego navega al

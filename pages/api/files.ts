@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createGitHubService, createGitHubDataService } from '@/lib/github';
-import { verifySession } from '@/lib/timers';
+import { verifySession, resolveAdRedirect } from '@/lib/timers';
 
 // Simple memory cache to absorb traffic spikes in serverless
 let manifestCache: any = null;
@@ -17,8 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.user_session;
     const session = token ? verifySession(token) : null;
     
-    // El usuario solo necesita haber completado el paso 1 (timer)
-    if (!session || !session.entry1Completed) {
+    // El usuario debe haber completado el timer Y la visita al anuncio (7s fuera)
+    if (!session || !session.entry1Completed || !resolveAdRedirect(session).adRedirectCompleted) {
       return res.status(401).json({ success: false, error: 'Unauthorized', files: [] });
     }
 

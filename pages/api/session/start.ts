@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     session = completeEntry1(session);
     
     const newToken = signSession(session);
-    res.setHeader('Set-Cookie', `user_session=${newToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600`);
+    res.setHeader('Set-Cookie', `user_session=${newToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`);
 
     return res.status(200).json({ success: true, message: 'Step 1 completed' });
   } catch (error: any) {
