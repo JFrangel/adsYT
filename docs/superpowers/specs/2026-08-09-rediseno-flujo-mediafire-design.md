@@ -30,12 +30,12 @@ ninguna ruta que mueva binarios → el límite de 6MB deja de ser relevante.
 ┌─────────────────┐           ┌─────────────────────┐          ┌──────────────────────────┐
 │ Timer 8s + ad   │  ──────>  │ Lista de archivos   │  ─────>  │ Pestaña nueva: MediaFire │
 │ en página       │  cookie   │ (enlaces MediaFire) │          │ Pestaña actual: countdown│
-│                 │  sesión   │                     │          │ 5s → redirect a Monetag  │
+│                 │  sesión   │                     │          │ 8s → redirect a Monetag  │
 └─────────────────┘           └─────────────────────┘          └──────────────────────────┘
 ```
 
 - Comportamiento al descargar (confirmado): **2 pestañas** — MediaFire se abre en una
-  pestaña nueva; la pestaña actual muestra un countdown de **5s** y luego navega al
+  pestaña nueva; la pestaña actual muestra un countdown de **8s** (igual que el flujo anterior, decidido por el usuario) y luego navega al
   link del ad (`/api/get-redirect-link`, con fallback si falla).
 - El contador de descargas se registra en el momento del clic (`POST /api/download`),
   best-effort (no bloquea al usuario).
@@ -164,7 +164,7 @@ Se retiran del `package.json`: `formidable`, `@types/formidable` (ya sin uso).
 
 1. `npm run build` compila sin errores y sin `formidable` en dependencias.
 2. Flujo completo local: timer 8s → `/descargas` lista archivos → clic descarga abre
-   MediaFire en pestaña nueva, countdown 5s y redirect al ad en la actual; contador
+   MediaFire en pestaña nueva, countdown 8s y redirect al ad en la actual; contador
    de descargas incrementa en el manifest.
 3. Admin: crear enlace MediaFire válido aparece en la lista y en `/descargas`;
    URL no-MediaFire es rechazada con error claro; eliminar lo quita de ambas.

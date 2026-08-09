@@ -10,7 +10,7 @@ export default function App({ Component, pageProps }: AppProps) {
     // Si el usuario recarga la página (F5) o entra directo por URL, la app se montará "en fresco".
     // Evaluamos si no está en la raíz ni en el admin. Si es así, lo devolvemos al inicio.
     // Navegaciones asíncronas con next/router NO disparan este useEffect.
-    const allowedInitialPaths = ['/', '/admin'];
+    const allowedInitialPaths = ['/', '/admin', '/admin/login', '/descargas'];
     
     // Solo expulsar si la ruta de montaje inicial no es permitida
     if (!allowedInitialPaths.includes(router.pathname)) {

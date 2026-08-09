@@ -4,7 +4,7 @@
 
 **Goal:** Eliminar el error 400 de subida reemplazando uploads binarios por enlaces MediaFire pegados en el admin, simplificar el flujo a timer → descargas → ad final, y rediseñar toda la UI con un sistema dark monocromo minimalista con acento naranja.
 
-**Architecture:** Next.js 14 Pages Router. Los metadatos de archivos viven en `manifest.json` en la rama `data` del repo GitHub (via Contents API); ya no se mueve ningún binario por el servidor. La sesión de usuario es un JWT en cookie httpOnly que solo registra `entry1Completed`. El frontend abre MediaFire en pestaña nueva y redirige la pestaña actual al link de ads tras un countdown de 5s.
+**Architecture:** Next.js 14 Pages Router. Los metadatos de archivos viven en `manifest.json` en la rama `data` del repo GitHub (via Contents API); ya no se mueve ningún binario por el servidor. La sesión de usuario es un JWT en cookie httpOnly que solo registra `entry1Completed`. El frontend abre MediaFire en pestaña nueva y redirige la pestaña actual al link de ads tras un countdown de 8s.
 
 **Tech Stack:** Next.js 14.1, React 18, TypeScript 5.3, Tailwind CSS 3.4, axios, jsonwebtoken, vitest (nuevo, solo dev).
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Countdown post-descarga: **5 segundos** exactos, luego redirect al URL de `/api/get-redirect-link`.
+- Countdown post-descarga: **8 segundos** exactos (actualizado por decisión del usuario durante la ejecución), luego redirect al URL de `/api/get-redirect-link`.
 - URLs de archivo válidas: **https** con host `mediafire.com`, `www.mediafire.com` o `*.mediafire.com`. Nada más.
 - Paleta: fondo `#0A0A0A`, superficies `#111113` / `#18181B`, acento único `#FF6B35` (`primary`), verde `#22C55E` solo para confirmaciones. Prohibido en UI nueva: gradientes morados, `blur-3xl` decorativo, grid de fondo, emojis en copy.
 - Animaciones: 150–250ms, easing estándar; todo bajo `@media (prefers-reduced-motion: reduce)` se desactiva.
@@ -1085,7 +1085,7 @@ git commit -m "feat: home minimalista con timer y CTA directo a descargas"
 
 **Interfaces:**
 - Consumes: `GET /api/files` (Task 3: `{ files: FileEntry[] }`, 401 sin sesión), `POST /api/download?file=<id>` (Task 3), `GET /api/get-redirect-link` (existente, responde `{ url: string }`), clases de Task 5, `FolderIcon`/`DownloadIcon`/`FileIcon` de `@/components/Icons`.
-- Produces: flujo completo de descarga con 2 pestañas (MediaFire nueva + countdown 5s → ad en la actual).
+- Produces: flujo completo de descarga con 2 pestañas (MediaFire nueva + countdown 8s → ad en la actual).
 
 - [ ] **Step 1: Crear `pages/descargas.tsx`**
 
@@ -1802,7 +1802,7 @@ npm run build
 npm start
 ```
 
-En `http://localhost:3000`: timer → descargas → clic Descargar → se abre MediaFire en pestaña nueva, countdown "Continuando en 5s…" y redirect al link de ads en la pestaña original. Detener el server.
+En `http://localhost:3000`: timer → descargas → clic Descargar → se abre MediaFire en pestaña nueva, countdown "Continuando en 8s…" y redirect al link de ads en la pestaña original. Detener el server.
 
 - [ ] **Step 4: Commit final**
 
