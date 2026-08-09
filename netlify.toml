@@ -1,19 +1,17 @@
 [build]
   command = "npm run build"
   publish = ".next"
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- files/ data/"
-  
-[build.environment]
-  NODE_VERSION = "18"
 
-# Only build on main branch to avoid builds from data branch
+[build.environment]
+  NODE_VERSION = "20"
+
+# La rama "data" solo guarda JSON (manifest, contadores): nunca debe construir.
 [context.branch-deploy]
-  command = "echo 'Skipping build for non-main branch'"
+  command = "echo 'Rama sin build (solo datos)'"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Sin reglas de redirect propias: el plugin de Next.js genera las suyas y
+# cualquier catch-all aquí tiene prioridad sobre ellas, lo que rompería las
+# rutas de la app y /api/*. Los redirects de la app viven en next.config.js.

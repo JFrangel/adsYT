@@ -105,11 +105,15 @@ export default function Home() {
     setAdHint(null);
 
     try {
-      // 1) Sellar la salida en la cookie (server-side, es la autoridad de los 7s)
-      await axios.post('/api/session/ad-visit');
-      // 2) Obtener el link del anuncio
+      // 1) Obtener el link ANTES de sellar. Si se sella primero y esto falla,
+      //    el usuario queda con el reloj corriendo sin haber visto el anuncio
+      //    y la UI le pide "permanece más segundos" sin motivo.
       const response = await axios.get('/api/get-redirect-link');
-      const adUrl = response.data.url;
+      const adUrl = response.data?.url;
+      if (!adUrl) throw new Error('Sin URL de anuncio');
+
+      // 2) Ahora sí, sellar la salida (server-side, es la autoridad de los 7s)
+      await axios.post('/api/session/ad-visit');
 
       if (!adWindow) {
         // Fallback universal: misma pestaña, regreso manual con atrás.

@@ -22,15 +22,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ success: false, error: 'Unauthorized', files: [] });
     }
 
-    // Marcar la sesión como usada: refrescar /descargas sigue funcionando, pero
-    // al volver a entrar por la home se exigirá repetir el flujo completo.
-    if (!session.consumed) {
+    // Marca la sesión como usada. Solo se llama cuando la lista se sirvió de
+    // verdad: si GitHub falla, el usuario no vio nada y conserva su acceso.
+    const markConsumed = () => {
+      if (session.consumed) return;
       const consumed = consumeSession(resolveAdRedirect(session));
       res.setHeader(
         'Set-Cookie',
         `user_session=${signSession(consumed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`
       );
-    }
+    };
 
     const githubData = createGitHubDataService();
     
