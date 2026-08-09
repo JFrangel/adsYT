@@ -17,8 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.user_session;
     const session = token ? verifySession(token) : null;
     
-    // Strict verification: User must have completed both steps
-    if (!session || !session.entry1Completed || !session.entry2Completed) {
+    // El usuario solo necesita haber completado el paso 1 (timer)
+    if (!session || !session.entry1Completed) {
       return res.status(401).json({ success: false, error: 'Unauthorized', files: [] });
     }
 
@@ -55,14 +55,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       lastCacheTime = now;
     }
 
-    // Combine manifest data with download stats
-    const filesWithStats = manifest.files?.map((file: any) => ({
-      ...file,
-      downloads: downloadStats[file.id] || file.downloads || 0, // Use data branch stats, fallback to manifest, then 0
-      downloadUrl: githubData.getRawUrl(`files/${file.filename}`), // Direct GitHub raw URL for downloads
-    })) || [];
+    // Combinar manifest con stats de descargas. Solo entradas nuevas (con url de MediaFire).
+    const filesWithStats = (manifest.files || [])
+      .filter((file: any) => typeof file.url === 'string' && file.url.length > 0)
+      .map((file: any) => ({
+        id: file.id,
+        name: file.name,
+        url: file.url,
+        size: file.size,
+        createdAt: file.createdAt,
+        visible: file.visible,
+        downloads: downloadStats[file.id] || file.downloads || 0,
+      }));
 
-    // Filter visible files only
     const visibleFiles = filesWithStats.filter((f: any) => f.visible !== false);
 
     console.log('✅ Files served with combined stats from main + data branches');
