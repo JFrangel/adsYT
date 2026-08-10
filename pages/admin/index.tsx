@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import axios from 'axios';
 import { AdminIcon, LogoutIcon, UploadIcon, FolderIcon, FileIcon, DeleteIcon, DownloadIcon, LoadingSpinner } from '@/components/Icons';
-import { AlertDialog, ConfirmDialog, PromptDialog } from '@/components/Dialog';
+import { AlertDialog, ConfirmDialog } from '@/components/Dialog';
 import { useDialog } from '@/hooks/useDialog';
 import { isValidMediafireUrl } from '@/lib/mediafire';
 
@@ -35,6 +35,11 @@ export default function AdminPanel() {
   const [linkSize, setLinkSize] = useState('');
   const [savingLink, setSavingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [adName, setAdName] = useState('');
+  const [adUrlValue, setAdUrlValue] = useState('');
+  const [savingAd, setSavingAd] = useState(false);
+  const [adError, setAdError] = useState<string | null>(null);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [links, setLinks] = useState<LinkConfig[]>([]);
@@ -48,9 +53,6 @@ export default function AdminPanel() {
     confirmState,
     showConfirm,
     closeConfirm,
-    promptState,
-    showPrompt,
-    closePrompt,
   } = useDialog();
 
   useEffect(() => {
@@ -119,71 +121,61 @@ export default function AdminPanel() {
     }
   };
 
-  const addNewLink = () => {
-    showPrompt(
-      'Agregar Nuevo Link',
-      'Nombre del link (ej: Monetag, AdSterra):',
-      (name) => {
-        // Segundo prompt para URL
-        showPrompt(
-          'URL del Link',
-          `URL para ${name}:`,
-          async (url) => {
-            try {
-              const response = await axios.put('/api/admin/links-config', { 
-                addLink: { name, url } 
-              });
-              setLinks(response.data.config.links);
-              showAlert('Link Agregado', 'Link agregado correctamente', 'success');
-            } catch (error) {
-              console.error('Error adding link:', error);
-              showAlert('Error', 'Error al agregar link', 'error');
-            }
-          },
-          {
-            placeholder: 'https://ejemplo.com/link',
-            inputType: 'url'
-          }
-        );
-      },
-      {
-        placeholder: 'Nombre del servicio'
-      }
-    );
+
+
+  const submitAdLink = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAdError(null);
+
+    if (!adName.trim()) {
+      setAdError('Ingresa un nombre para el link');
+      return;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(adUrlValue.trim());
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error();
+    } catch {
+      setAdError('Ingresa una URL válida (empieza por https://)');
+      return;
+    }
+
+    setSavingAd(true);
+    try {
+      const payload = editingAdId
+        ? { editLink: { id: editingAdId, name: adName.trim(), url: adUrlValue.trim() } }
+        : { addLink: { name: adName.trim(), url: adUrlValue.trim() } };
+
+      const response = await axios.put('/api/admin/links-config', payload);
+      setLinks(response.data.config.links);
+      cancelAdEdit();
+      showAlert(
+        editingAdId ? 'Link actualizado' : 'Link agregado',
+        'La configuración de monetización se guardó correctamente',
+        'success'
+      );
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message;
+      setAdError(msg);
+      showAlert('Error', 'No se pudo guardar el link: ' + msg, 'error');
+    } finally {
+      setSavingAd(false);
+    }
   };
 
-  const editLink = (linkId: string, currentName: string, currentUrl: string) => {
-    showPrompt(
-      'Editar Link',
-      'Nuevo nombre del link:',
-      (name) => {
-        showPrompt(
-          'Editar URL',
-          `Nuevo URL para ${name}:`,
-          async (url) => {
-            try {
-              const response = await axios.put('/api/admin/links-config', { 
-                editLink: { id: linkId, name, url } 
-              });
-              setLinks(response.data.config.links);
-              showAlert('Link Actualizado', 'Link actualizado correctamente', 'success');
-            } catch (error) {
-              console.error('Error editing link:', error);
-              showAlert('Error', 'Error al editar link', 'error');
-            }
-          },
-          {
-            placeholder: 'https://ejemplo.com/link',
-            defaultValue: currentUrl,
-            inputType: 'url'
-          }
-        );
-      },
-      {
-        placeholder: 'Nombre del servicio',
-        defaultValue: currentName
-      }
-    );
+  const startAdEdit = (linkId: string, name: string, url: string) => {
+    setEditingAdId(linkId);
+    setAdName(name);
+    setAdUrlValue(url);
+    setAdError(null);
+  };
+
+  const cancelAdEdit = () => {
+    setEditingAdId(null);
+    setAdName('');
+    setAdUrlValue('');
+    setAdError(null);
   };
 
   const deleteLink = (linkId: string, linkName: string) => {
@@ -522,12 +514,49 @@ export default function AdminPanel() {
 
             {/* Herramientas de Administracion y Mantenimiento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <button
-                onClick={addNewLink}
-                className="btn-secondary"
-              >
-                Agregar nuevo link
-              </button>
+              <form onSubmit={submitAdLink} className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Nombre</label>
+                    <input
+                      type="text"
+                      value={adName}
+                      onChange={(e) => setAdName(e.target.value)}
+                      className="input-field"
+                      placeholder="Ej: Monetag"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">
+                      URL del anuncio
+                    </label>
+                    <input
+                      type="url"
+                      value={adUrlValue}
+                      onChange={(e) => setAdUrlValue(e.target.value)}
+                      className="input-field"
+                      placeholder="https://…"
+                    />
+                  </div>
+                </div>
+
+                {adError && <p className="text-sm text-red-400 fade-in">{adError}</p>}
+
+                <div className="flex flex-wrap gap-3">
+                  <button type="submit" disabled={savingAd} className="btn-primary">
+                    {savingAd
+                      ? 'Guardando…'
+                      : editingAdId
+                      ? 'Guardar cambios'
+                      : 'Agregar link'}
+                  </button>
+                  {editingAdId && (
+                    <button type="button" onClick={cancelAdEdit} className="btn-secondary">
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
             </div>
 
             {/* Links List */}
@@ -632,7 +661,7 @@ export default function AdminPanel() {
                             {link.enabled ? 'Pausar' : 'Habilitar'}
                           </button>
                           <button
-                            onClick={() => editLink(link.id, link.name, link.url)}
+                            onClick={() => startAdEdit(link.id, link.name, link.url)}
                             className="px-4 py-2.5 rounded-lg font-bold text-xs bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,16 +749,6 @@ export default function AdminPanel() {
         cancelText={confirmState.cancelText}
       />
 
-      <PromptDialog
-        isOpen={promptState.isOpen}
-        onClose={closePrompt}
-        onSubmit={promptState.onSubmit || (() => {})}
-        title={promptState.title}
-        message={promptState.message}
-        placeholder={promptState.placeholder}
-        defaultValue={promptState.defaultValue}
-        type={promptState.inputType}
-      />
     </>
   );
 }
