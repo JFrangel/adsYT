@@ -95,7 +95,14 @@ export default function Descargas() {
       axios
         .get('/api/get-redirect-link')
         .then((response) => {
-          window.location.href = response.data.url;
+          if (response.data?.url) {
+            window.location.href = response.data.url;
+          } else {
+            // Sin anuncio configurado no hay a dónde ir: liberar la página en
+            // vez de dejar el botón bloqueado.
+            setRedirectingId(null);
+            setCounter(REDIRECT_SECONDS);
+          }
         })
         .catch(() => {
           // Si el link de ads falla, no navegar a una URL rota

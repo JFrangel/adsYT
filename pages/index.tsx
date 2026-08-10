@@ -24,6 +24,7 @@ export default function Home() {
   const [adHint, setAdHint] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const [adUrl, setAdUrl] = useState<string | null>(null);
+  const [adLinkId, setAdLinkId] = useState<string | null>(null);
   // Si el admin no tiene ningún link de anuncio, el paso se salta en vez de
   // dejar al usuario atascado esperando un anuncio que nunca llegará.
   const [adRequired, setAdRequired] = useState(true);
@@ -95,10 +96,20 @@ export default function Home() {
     if (stage !== 'ad' || adUrl || !adRequired) return;
     let cancelled = false;
 
+    // preview=1: solo consulta la URL, no cuenta la vista. El conteo se hace
+    // al salir de verdad hacia el anuncio (/api/session/ad-visit).
     axios
-      .get('/api/get-redirect-link')
+      .get('/api/get-redirect-link?preview=1')
       .then((response) => {
-        if (!cancelled && response.data?.url) setAdUrl(response.data.url);
+        if (cancelled) return;
+        if (response.data?.url) {
+          setAdUrl(response.data.url);
+          setAdLinkId(response.data.linkId || null);
+        } else {
+          // No hay anuncio configurado: no tiene sentido retener al usuario
+          setAdRequired(false);
+          setStage('ready');
+        }
       })
       .catch(() => {
         if (!cancelled) setAdHint('No se pudo cargar el anuncio. Recarga la página.');
@@ -139,20 +150,41 @@ export default function Home() {
     setLeaving(true);
     setAdHint(null);
 
-    // Sellar la salida en el servidor (autoridad de los 7s). keepalive permite
-    // que la petición sobreviva aunque la pestaña navegue en el fallback.
-    const stamped = fetch('/api/session/ad-visit', { method: 'POST', keepalive: true });
+    // Sellar la salida y contar la vista. keepalive permite que la petición
+    // sobreviva aunque la pestaña navegue en el camino alternativo.
+    const stamped = fetch('/api/session/ad-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkId: adLinkId }),
+      keepalive: true,
+    });
 
-    if (!adWindow) {
-      // Popup bloqueado (común en móvil): misma pestaña, regreso con el botón
-      // atrás. pageshow/focus revalidan el estado al volver.
-      stamped
-        .catch(() => {})
-        .finally(() => {
-          window.location.href = adUrl;
-        });
+    // Ir en esta misma pestaña: siempre funciona. El usuario vuelve con el
+    // botón atrás y pageshow/focus revalidan el estado.
+    const irEnEstaPestana = () => {
+      if (adTimerRef.current) {
+        clearInterval(adTimerRef.current);
+        adTimerRef.current = null;
+      }
+      setAdCountdown(null);
+      stamped.catch(() => {}).finally(() => {
+        window.location.href = adUrl;
+      });
+    };
+
+    // Un bloqueador puede devolver null, o devolver una ventana y cerrarla
+    // acto seguido. Sin comprobar 'closed' el countdown corría con la pestaña
+    // del anuncio nunca abierta: el usuario esperaba para nada.
+    if (!adWindow || adWindow.closed) {
+      irEnEstaPestana();
       return;
     }
+
+    // Segunda comprobación diferida para los bloqueadores que la cierran un
+    // instante después de abrirla.
+    setTimeout(() => {
+      if (adWindow.closed) irEnEstaPestana();
+    }, 500);
 
     // Cierre automático a los 7s. Deadline real en vez de restar por tick:
     // esta pestaña queda en segundo plano y ahí los navegadores ralentizan

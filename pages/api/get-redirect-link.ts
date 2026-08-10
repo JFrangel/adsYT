@@ -10,8 +10,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const config = await getLinksConfig();
     const enabledLinks = config.links.filter((link) => link.enabled);
 
+    // Sin links configurados no es un error del cliente: se responde 200 con
+    // url vacía para que la página lo trate como "no hay anuncio" en vez de
+    // quedarse esperando o fallar en silencio.
     if (enabledLinks.length === 0) {
-      return res.status(503).json({ error: 'No hay links de anuncio configurados' });
+      return res.status(200).json({ url: null, disponible: false });
     }
 
     let selectedLink: LinkConfig;
@@ -26,7 +29,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       selectedLink = enabledLinks[nextIndex];
     }
 
-    const clicks = await registerAdView(selectedLink.id, nextIndex);
+    // La home precarga el link al entrar al paso, antes de que el usuario
+    // decida ir. Con ?preview=1 no se cuenta la vista: el conteo lo hace
+    // /api/session/ad-visit, que se llama justo al salir hacia el anuncio.
+    const esPreview = req.query.preview === '1';
+    const clicks = esPreview
+      ? selectedLink.clicks
+      : await registerAdView(selectedLink.id, nextIndex);
 
     return res.status(200).json({
       url: selectedLink.url,
@@ -34,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       linkName: selectedLink.name,
       clicks,
       mode: config.mode,
+      disponible: true,
     });
   } catch (error: any) {
     console.error('Error in get-redirect-link:', error.message);
