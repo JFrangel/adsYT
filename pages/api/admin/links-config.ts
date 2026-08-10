@@ -1,8 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdmin } from '@/lib/auth';
 import { getClicks, clickCache, initializeFromCheckpoint } from '@/lib/click-cache';
 import { getLinksConfig, saveLinksConfig, LinkConfig, LinksData } from '@/lib/links-config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Solo admin: sin esto cualquiera podía cambiar la URL a la que se redirige
+  // a los usuarios (secuestro del tráfico) o borrar los links de monetización.
+  try {
+    requireAdmin(req);
+  } catch (error: any) {
+    return res.status(401).json({ error: error.message });
+  }
+
   if (req.method === 'GET') {
     // Obtener configuración de links
     try {
