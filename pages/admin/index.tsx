@@ -39,10 +39,6 @@ export default function AdminPanel() {
   const [mounted, setMounted] = useState(false);
   const [links, setLinks] = useState<LinkConfig[]>([]);
   const [linksMode, setLinksMode] = useState<'single' | 'alternate'>('single');
-  const [savingCheckpoint, setSavingCheckpoint] = useState(false);
-  const [refreshingClicks, setRefreshingClicks] = useState(false);
-  const [refreshingDownloads, setRefreshingDownloads] = useState(false);
-  const [debuggingCache, setDebuggingCache] = useState(false);
   
   // Dialog hooks
   const {
@@ -89,73 +85,8 @@ export default function AdminPanel() {
     }
   };
 
-  const refreshClicks = async () => {
-    setRefreshingClicks(true);
-    try {
-      // Primero sincronizar con GitHub
-      const syncResponse = await axios.post('/api/admin/sync-clicks');
-      
-      // Luego actualizar la vista
-      await fetchLinks();
-      
-      showAlert(
-        'Clicks Sincronizados', 
-        'Los conteos de clicks se sincronizaron con GitHub y se actualizaron correctamente',
-        'success'
-      );
-      
-      console.log('✅ Clicks synced:', syncResponse.data.clicks);
-    } catch (error) {
-      showAlert('Error', 'No se pudieron sincronizar los clicks con GitHub', 'error');
-      console.error('Error syncing clicks:', error);
-    } finally {
-      setRefreshingClicks(false);
-    }
-  };
 
-  const refreshDownloads = async () => {
-    setRefreshingDownloads(true);
-    try {
-      // Sincronizar estadísticas de descargas desde rama data
-      const syncResponse = await axios.post('/api/admin/sync-downloads');
-      
-      // Actualizar la vista de archivos
-      await fetchFiles();
-      
-      showAlert(
-        'Descargas Sincronizadas', 
-        'Las estadísticas de descarga se sincronizaron desde la rama data correctamente',
-        'success'
-      );
-      
-      console.log('✅ Downloads synced:', syncResponse.data.downloads);
-    } catch (error) {
-      showAlert('Error', 'No se pudieron sincronizar las estadísticas de descarga', 'error');
-      console.error('Error syncing downloads:', error);
-    } finally {
-      setRefreshingDownloads(false);
-    }
-  };
 
-  const debugCache = async () => {
-    setDebuggingCache(true);
-    try {
-      const debugResponse = await axios.get('/api/admin/debug-clicks');
-      
-      console.log('🔍 Cache Debug Info:', debugResponse.data.debug);
-      
-      showAlert(
-        'Cache Debug Complete', 
-        'Información del cache enviada a la consola. Abre Developer Tools (F12) para ver los detalles.',
-        'info'
-      );
-    } catch (error) {
-      showAlert('Error', 'No se pudo obtener información de debug', 'error');
-      console.error('Error debugging cache:', error);
-    } finally {
-      setDebuggingCache(false);
-    }
-  };
 
   const updateLinkMode = async (newMode: 'single' | 'alternate') => {
     try {
@@ -279,49 +210,6 @@ export default function AdminPanel() {
     );
   };
 
-  const saveCheckpoint = () => {
-    showConfirm(
-      'Guardar Checkpoint',
-      '¿Guardar checkpoint de clicks actual a GitHub?\n\nSe guardará un commit con el estado actual.',
-      async () => {
-        setSavingCheckpoint(true);
-        try {
-          const response = await axios.post('/api/admin/save-checkpoint');
-          
-          // Formatear los clicks de todos los links
-          const clicksText = Object.entries(response.data.clicks)
-            .map(([linkId, clicks]) => {
-              const link = links.find(l => l.id === linkId);
-              const linkName = link ? link.name : linkId;
-              return `${linkName}: ${clicks} clicks`;
-            })
-            .join('\n');
-          
-          showAlert(
-            'Checkpoint Guardado',
-            clicksText || 'Checkpoint guardado exitosamente',
-            'success'
-          );
-          await fetchLinks();
-        } catch (error: any) {
-          const errorMsg = error.response?.data?.error || error.message;
-          showAlert(
-            'Error al Guardar',
-            `Error: ${errorMsg}\n\nVerifica que GITHUB_TOKEN esté configurado en las variables de entorno.`,
-            'error'
-          );
-          console.error('Error saving checkpoint:', error);
-        } finally {
-          setSavingCheckpoint(false);
-        }
-      },
-      {
-        type: 'info',
-        confirmText: 'Guardar',
-        cancelText: 'Cancelar'
-      }
-    );
-  };
 
   const fetchFiles = async () => {
     try {
@@ -622,83 +510,12 @@ export default function AdminPanel() {
 
             {/* Herramientas de Administracion y Mantenimiento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              {/* Gestión de Monetización */}
-              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-white/10 shadow-inner">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
-                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                  </svg>
-                  Gestión de Links & Clicks
-                </h3>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={addNewLink}
-                    className="w-full px-4 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white hover:from-green-500 hover:to-emerald-600 transition-all shadow border border-green-500/30 flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Agregar Nuevo Link
-                  </button>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={refreshClicks}
-                      disabled={refreshingClicks}
-                      className="w-full px-3 py-2.5 rounded-lg font-bold text-xs bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10 transition-all flex justify-center items-center gap-1 disabled:opacity-50"
-                    >
-                      <svg className={`w-4 h-4 ${refreshingClicks ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      {refreshingClicks ? 'Sincronizando...' : 'Actualizar Clicks'}
-                    </button>
-                    <button
-                      onClick={saveCheckpoint}
-                      disabled={savingCheckpoint}
-                      className="w-full px-3 py-2.5 rounded-lg font-bold text-xs bg-blue-500/20 text-blue-200 hover:bg-blue-500/40 border border-blue-500/30 transition-all flex justify-center items-center gap-1 disabled:opacity-50"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                      </svg>
-                      {savingCheckpoint ? 'Guardando...' : 'Fijar Checkpoint'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Herramientas del Sistema */}
-              <div className="bg-gradient-to-br from-black/20 to-black/40 rounded-xl p-5 border border-white/10 shadow-inner">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
-                  <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Herramientas y Reportes
-                </h3>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={refreshDownloads}
-                    disabled={refreshingDownloads}
-                    className="w-full px-4 py-3 rounded-lg font-bold text-sm bg-gradient-to-r from-blue-500/80 to-indigo-600/80 text-white hover:from-blue-500 hover:to-indigo-600 transition-all shadow border border-blue-500/30 flex items-center justify-center gap-2"
-                  >
-                    <svg className={`w-5 h-5 ${refreshingDownloads ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {refreshingDownloads ? 'Sincronizando...' : 'Actualizar Estadísticas de Descarga'}
-                  </button>
-                  
-                  <button
-                    onClick={debugCache}
-                    disabled={debuggingCache}
-                    className="w-full px-4 py-2.5 rounded-lg font-bold text-xs bg-amber-500/20 text-amber-200 hover:bg-amber-500/40 border border-amber-500/30 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
-                  >
-                    <svg className={`w-4 h-4 ${debuggingCache ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {debuggingCache ? 'Analizando Caché...' : 'Modo Debug (Inspeccionar Caché)'}
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={addNewLink}
+                className="btn-secondary"
+              >
+                Agregar nuevo link
+              </button>
             </div>
 
             {/* Links List */}
@@ -768,7 +585,7 @@ export default function AdminPanel() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex lg:flex-col gap-2 w-full lg:w-auto">
+                        <div className="flex flex-wrap lg:flex-col gap-2 w-full lg:w-auto">
                           {linksMode === 'single' && (
                             <button
                               onClick={() => setActiveLink(link.id)}

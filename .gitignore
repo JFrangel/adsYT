@@ -29,6 +29,9 @@ yarn-error.log*
 archivos/
 files/
 
+# Datos locales de desarrollo (en producción esto vive en Netlify Blobs)
+.data/
+
 # Vercel
 .vercel
 

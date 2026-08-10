@@ -23,7 +23,7 @@
 
 @layer components {
   .card {
-    @apply bg-dark-800 border border-white/[0.08] rounded-2xl p-6 sm:p-8;
+    @apply bg-dark-800 border border-white/[0.08] rounded-2xl p-5 sm:p-8;
   }
 
   .btn-primary {
@@ -66,9 +66,15 @@
            transition-colors duration-150 hover:border-white/[0.14];
   }
 
+  /* Los formatos de anuncio traen ancho fijo (300px). En móvil eso no cabe
+     dentro del card, así que el marco reduce su padding lateral y, como red
+     de seguridad, desplaza dentro de su propia caja en vez de romper la
+     página con scroll horizontal. */
   .ad-frame {
-    @apply border border-white/[0.06] rounded-xl bg-dark-900 p-4
-           flex flex-col items-center justify-center min-h-[266px];
+    @apply border border-white/[0.06] rounded-xl bg-dark-900 py-4 px-0 sm:px-4
+           -mx-3 sm:mx-0 w-[calc(100%+1.5rem)] sm:w-full
+           flex flex-col items-center justify-center min-h-[266px]
+           overflow-x-auto;
   }
 
   .ad-frame::before {

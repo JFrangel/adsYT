@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createGitHubService, createGitHubDataService } from '@/lib/github';
 import { verifySession, resolveAdRedirect, consumeSession, signSession } from '@/lib/timers';
+import { readJson, KEYS } from '@/lib/storage';
+import type { FileEntry } from '@/pages/api/admin/files';
 
-// Simple memory cache to absorb traffic spikes in serverless
-let manifestCache: any = null;
-let statsCache: any = null;
-let lastCacheTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+interface FilesData {
+  files: FileEntry[];
+}
+
+const EMPTY: FilesData = { files: [] };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -16,81 +17,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const token = req.cookies.user_session;
     const session = token ? verifySession(token) : null;
-    
+
     // El usuario debe haber completado el timer Y la visita al anuncio (7s fuera)
     if (!session || !session.entry1Completed || !resolveAdRedirect(session).adRedirectCompleted) {
       return res.status(401).json({ success: false, error: 'Unauthorized', files: [] });
     }
 
-    // Marca la sesión como usada. Solo se llama cuando la lista se sirvió de
-    // verdad: si GitHub falla, el usuario no vio nada y conserva su acceso.
-    const markConsumed = () => {
-      if (session.consumed) return;
+    const data = await readJson<FilesData>(KEYS.files, EMPTY);
+    const visibleFiles = (data.files || []).filter((f) => f.visible !== false);
+
+    // Marcar la sesión como usada: refrescar /descargas sigue funcionando, pero
+    // al volver a entrar por la home se exigirá repetir el flujo completo.
+    if (!session.consumed) {
       const consumed = consumeSession(resolveAdRedirect(session));
       res.setHeader(
         'Set-Cookie',
         `user_session=${signSession(consumed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`
       );
-    };
-
-    const githubData = createGitHubDataService();
-    
-    const now = Date.now();
-    let manifest;
-    let downloadStats: any = {};
-
-    if (manifestCache && statsCache && now - lastCacheTime < CACHE_TTL) {
-      console.log('⚡ Using cached manifest and stats');
-      manifest = manifestCache;
-      downloadStats = statsCache;
-    } else {
-      console.log('📋 Fetching manifest from GitHub API...');
-      const manifestFile = await githubData.getFile('manifest.json');
-      if (!manifestFile) {
-        return res.status(200).json({ files: [] });
-      }
-      manifest = JSON.parse(Buffer.from(manifestFile.content, 'base64').toString('utf-8'));
-      
-      try {
-        const downloadsFile = await githubData.getFile('downloads-stats.json');
-        if (downloadsFile) {
-          downloadStats = JSON.parse(Buffer.from(downloadsFile.content, 'base64').toString('utf-8'));
-        }
-      } catch (statsError) {
-        console.log('ℹ️ No download stats found');
-      }
-
-      // Update cache
-      manifestCache = manifest;
-      statsCache = downloadStats;
-      lastCacheTime = now;
     }
 
-    // Combinar manifest con stats de descargas. Solo entradas nuevas (con url de MediaFire).
-    const filesWithStats = (manifest.files || [])
-      .filter((file: any) => typeof file.url === 'string' && file.url.length > 0)
-      .map((file: any) => ({
-        id: file.id,
-        name: file.name,
-        url: file.url,
-        size: file.size,
-        createdAt: file.createdAt,
-        visible: file.visible,
-        downloads: downloadStats[file.id] || file.downloads || 0,
-      }));
-
-    const visibleFiles = filesWithStats.filter((f: any) => f.visible !== false);
-
-    console.log('✅ Files served with combined stats from main + data branches');
     return res.status(200).json({ files: visibleFiles });
   } catch (error: any) {
-    console.error('Error fetching files:', error);
-    
-    // Return empty list if manifest doesn't exist yet
-    if (error.response?.status === 404) {
-      return res.status(200).json({ files: [] });
-    }
-    
+    console.error('Error fetching files:', error.message);
     return res.status(500).json({ error: 'Error fetching files' });
   }
 }

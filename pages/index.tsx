@@ -232,9 +232,9 @@ export default function Home() {
                     <button
                       onClick={handleVisitAd}
                       disabled={leaving || !adUrl}
-                      className="btn-primary w-full text-lg"
+                      className="btn-primary w-full text-base sm:text-lg"
                     >
-                      <AnnouncementIcon className="w-5 h-5" />
+                      <AnnouncementIcon className="w-5 h-5 shrink-0" />
                       {leaving ? 'Abriendo anuncio…' : !adUrl ? 'Cargando anuncio…' : 'Ver anuncio'}
                     </button>
                     <p className="text-sm text-zinc-500">
@@ -261,24 +261,26 @@ export default function Home() {
               </div>
             )}
 
-            <div className="ad-frame w-full">
+            <div className="ad-frame">
               <HighPerformanceAd />
             </div>
 
             <button
               onClick={() => router.push('/descargas')}
               disabled={stage !== 'ready'}
-              className={stage === 'ready' ? 'btn-primary w-full text-lg' : 'btn-secondary w-full text-lg'}
+              className={`w-full text-base sm:text-lg ${
+                stage === 'ready' ? 'btn-primary' : 'btn-secondary'
+              }`}
             >
               {stage === 'ready' ? (
                 <>
                   Continuar a descargas
-                  <ArrowIcon className="w-5 h-5" />
+                  <ArrowIcon className="w-5 h-5 shrink-0" />
                 </>
               ) : (
                 <>
-                  <LockIcon className="w-4 h-4" />
-                  {stage === 'ad' ? 'Visita el anuncio para continuar' : 'Completa el timer para continuar'}
+                  <LockIcon className="w-4 h-4 shrink-0" />
+                  {stage === 'ad' ? 'Visita el anuncio' : 'Completa el timer'}
                 </>
               )}
             </button>

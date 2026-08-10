@@ -22,7 +22,6 @@ export default function Descargas() {
   const [loading, setLoading] = useState(true);
   const [redirectingId, setRedirectingId] = useState<string | null>(null);
   const [counter, setCounter] = useState(REDIRECT_SECONDS);
-  const [blockedFile, setBlockedFile] = useState<FileItem | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -65,23 +64,16 @@ export default function Descargas() {
     };
   }, []);
 
+  // El botón es un <a target="_blank"> real: la navegación la hace el propio
+  // clic del usuario, así que el bloqueador de ventanas emergentes no la toca
+  // (window.open sí la bloqueaba y dejaba el flujo sin salida ni anuncio).
   const handleDownload = (file: FileItem) => {
     if (redirectingId) return;
 
-    // 1) Registrar la descarga (best-effort, no bloquea) — también en el
-    //    camino de popup bloqueado, para no perder el conteo.
+    // 1) Registrar la descarga (best-effort, no bloquea la navegación)
     axios.post(`/api/download?file=${file.id}`).catch(() => {});
 
-    // 2) MediaFire en pestaña nueva (dentro del gesto del usuario)
-    const win = window.open(file.url, '_blank', 'noopener,noreferrer');
-    if (!win) {
-      // Popup bloqueado: mostrar enlace directo para clic manual
-      setBlockedFile(file);
-      return;
-    }
-    setBlockedFile(null);
-
-    // 3) Countdown en esta pestaña y redirect al ad. Deadline real en lugar de
+    // 2) Countdown en esta pestaña y redirect al ad. Deadline real en lugar de
     //    restar por tick: esta pestaña puede quedar en segundo plano y los
     //    navegadores ralentizan los timers ahí.
     setRedirectingId(file.id);
@@ -161,10 +153,15 @@ export default function Descargas() {
                         {file.downloads} descargas
                       </p>
                     </div>
-                    <button
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => handleDownload(file)}
-                      disabled={redirectingId !== null}
-                      className="btn-primary sm:w-auto w-full"
+                      aria-disabled={redirectingId !== null}
+                      className={`btn-primary sm:w-auto w-full shrink-0 ${
+                        redirectingId !== null ? 'pointer-events-none opacity-40' : ''
+                      }`}
                     >
                       {redirectingId === file.id ? (
                         <span className="tabular-nums">Continuando en {counter}s…</span>
@@ -174,26 +171,10 @@ export default function Descargas() {
                           Descargar
                         </>
                       )}
-                    </button>
+                    </a>
                   </li>
                 ))}
               </ul>
-            )}
-
-            {blockedFile && (
-              <div className="mt-4 p-4 rounded-xl border border-primary/30 bg-primary/5 text-sm fade-in">
-                <p className="text-zinc-300">
-                  Tu navegador bloqueó la ventana emergente. Abre tu descarga aquí:
-                </p>
-                <a
-                  href={blockedFile.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary font-medium underline underline-offset-4 break-all"
-                >
-                  {blockedFile.name}
-                </a>
-              </div>
             )}
 
             {redirectingId && (
