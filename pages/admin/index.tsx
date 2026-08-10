@@ -448,6 +448,18 @@ export default function AdminPanel() {
               Links de Monetización
             </h2>
 
+            {links.filter((l) => l.enabled).length === 0 && (
+              <div className="mb-6 p-4 rounded-xl border border-primary/30 bg-primary/5">
+                <p className="text-sm text-zinc-300 font-medium">
+                  No hay ningún link de anuncio activo
+                </p>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Mientras tanto los usuarios pasan directo a las descargas, sin ver anuncios.
+                  Agrega tu link de Monetag aquí abajo para activar la monetización.
+                </p>
+              </div>
+            )}
+
             {/* Mode Selection */}
             <div className="mb-6 bg-gradient-to-br from-dark-800 to-dark-800 border border-white/10 rounded-xl p-5 shadow-xl">
               <div className="flex items-center justify-between mb-4">

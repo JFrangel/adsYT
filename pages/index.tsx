@@ -24,6 +24,9 @@ export default function Home() {
   const [adHint, setAdHint] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
   const [adUrl, setAdUrl] = useState<string | null>(null);
+  // Si el admin no tiene ningún link de anuncio, el paso se salta en vez de
+  // dejar al usuario atascado esperando un anuncio que nunca llegará.
+  const [adRequired, setAdRequired] = useState(true);
   const statusSeq = useRef(0);
   const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -36,7 +39,8 @@ export default function Home() {
       const response = await axios.get('/api/session/status');
       if (seq !== statusSeq.current) return;
 
-      const { entry1Completed, adCompleted, remainingMs } = response.data;
+      const { entry1Completed, adCompleted, remainingMs, adRequired } = response.data;
+      setAdRequired(adRequired !== false);
 
       // Al volver del anuncio la página puede restaurarse desde bfcache con el
       // estado React anterior: hay que soltar los flags de "en curso".
@@ -88,7 +92,7 @@ export default function Home() {
   // intermedia (que el bloqueador de popups y los scripts de anuncios tratan
   // de forma errática) y sin esperar a la red con el gesto ya consumido.
   useEffect(() => {
-    if (stage !== 'ad' || adUrl) return;
+    if (stage !== 'ad' || adUrl || !adRequired) return;
     let cancelled = false;
 
     axios
@@ -103,7 +107,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [stage, adUrl]);
+  }, [stage, adUrl, adRequired]);
 
   const handleTimerComplete = async () => {
     try {
@@ -111,7 +115,7 @@ export default function Home() {
       // fetch NO lanza en 4xx/5xx: sin este chequeo la UI avanzaría a 'ad'
       // sin cookie de sesión y el usuario quedaría atrapado en 401.
       if (!response.ok) throw new Error(`start devolvió ${response.status}`);
-      setStage('ad');
+      setStage(adRequired ? 'ad' : 'ready');
     } catch (error) {
       console.error('No se pudo iniciar la sesión', error);
       setAdHint('No se pudo iniciar la sesión. Recarga la página e inténtalo de nuevo.');

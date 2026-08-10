@@ -33,6 +33,18 @@ export async function getLinksConfig(): Promise<LinksData> {
   };
 }
 
+/**
+ * ¿Hay algún link de anuncio utilizable?
+ *
+ * Si no lo hay, el paso del anuncio no puede funcionar. En ese caso el sitio
+ * deja pasar en vez de bloquear a todo el mundo: un sitio sin monetizar es
+ * mejor que un sitio roto. En el admin se avisa de que falta configurarlo.
+ */
+export async function hasUsableAdLink(): Promise<boolean> {
+  const config = await getLinksConfig();
+  return config.links.some((link) => link.enabled && link.url);
+}
+
 export async function saveLinksConfig(config: LinksData): Promise<boolean> {
   try {
     await writeJson(KEYS.adLinks, config);

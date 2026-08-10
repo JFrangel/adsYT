@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { verifySession, resolveAdRedirect, signSession, AD_REDIRECT_MS } from '@/lib/timers';
+import { hasUsableAdLink } from '@/lib/links-config';
 
 // Estado actual de la sesión. Si ya pasaron los 7s desde la salida al anuncio,
 // marca el paso como completado y re-firma la cookie.
@@ -12,15 +13,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.user_session;
     const session = token ? verifySession(token) : null;
 
+    // Sin links de anuncio configurados el paso no puede funcionar; se informa
+    // para que el cliente lo salte en vez de dejar al usuario atascado.
+    const adRequired = await hasUsableAdLink();
+
     if (!session) {
-      return res.status(200).json({ entry1Completed: false, adCompleted: false });
+      return res.status(200).json({ entry1Completed: false, adCompleted: false, adRequired });
     }
 
     // Sesión de un solo uso: si el usuario ya llegó a ver los archivos y vuelve
     // a entrar por la home, se descarta y debe repetir timer + anuncio.
     if (session.consumed) {
       res.setHeader('Set-Cookie', 'user_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
-      return res.status(200).json({ entry1Completed: false, adCompleted: false, reset: true });
+      return res.status(200).json({
+        entry1Completed: false,
+        adCompleted: false,
+        adRequired,
+        reset: true,
+      });
     }
 
     const updated = resolveAdRedirect(session);
@@ -36,7 +46,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       entry1Completed: !!updated.entry1Completed,
-      adCompleted: !!updated.adRedirectCompleted,
+      adCompleted: !adRequired || !!updated.adRedirectCompleted,
+      adRequired,
       remainingMs,
     });
   } catch (error: any) {
