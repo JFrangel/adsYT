@@ -23,6 +23,7 @@ export default function Home() {
   const [leaving, setLeaving] = useState(false);
   const [adHint, setAdHint] = useState<string | null>(null);
   const [adCountdown, setAdCountdown] = useState<number | null>(null);
+  const [adUrl, setAdUrl] = useState<string | null>(null);
   const statusSeq = useRef(0);
   const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -59,7 +60,10 @@ export default function Home() {
     } catch {
       // Sin red no bloqueamos la UI: se queda en la etapa actual
     } finally {
-      if (seq === statusSeq.current) setChecking(false);
+      // Se limpia SIEMPRE, aunque la respuesta sea obsoleta: si se condiciona
+      // al guard de secuencia y llega otra consulta antes (pageshow y focus
+      // disparan casi a la vez), la página se queda cargando para siempre.
+      setChecking(false);
     }
   }, []);
 
@@ -79,6 +83,28 @@ export default function Home() {
     };
   }, [refreshStatus]);
 
+  // Precargar el link del anuncio en cuanto el paso queda disponible. Así el
+  // clic puede abrir la pestaña YA con la URL final: sin pestaña en blanco
+  // intermedia (que el bloqueador de popups y los scripts de anuncios tratan
+  // de forma errática) y sin esperar a la red con el gesto ya consumido.
+  useEffect(() => {
+    if (stage !== 'ad' || adUrl) return;
+    let cancelled = false;
+
+    axios
+      .get('/api/get-redirect-link')
+      .then((response) => {
+        if (!cancelled && response.data?.url) setAdUrl(response.data.url);
+      })
+      .catch(() => {
+        if (!cancelled) setAdHint('No se pudo cargar el anuncio. Recarga la página.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stage, adUrl]);
+
   const handleTimerComplete = async () => {
     try {
       const response = await fetch('/api/session/start', { method: 'POST' });
@@ -92,73 +118,68 @@ export default function Home() {
     }
   };
 
-  const handleVisitAd = async () => {
+  const handleVisitAd = () => {
     if (leaving) return;
 
-    // Se abre SINCRÓNICAMENTE dentro del clic para que el navegador lo trate
-    // como gesto del usuario. Si devuelve null (bloqueador de popups, común en
-    // móvil), caemos al redirect en la misma pestaña y el usuario vuelve con
-    // el botón atrás: pageshow/focus revalidan el estado igual.
-    const adWindow = window.open('', '_blank');
+    if (!adUrl) {
+      setAdHint('El anuncio aún se está cargando. Espera un momento.');
+      return;
+    }
+
+    // Se abre SINCRÓNICAMENTE dentro del clic y YA con la URL final: sin await
+    // previo (el gesto del usuario se pierde) y sin pestaña en blanco que luego
+    // se navega (eso es lo que hacía que la pestaña se comportara de forma
+    // errática con el script de anuncios).
+    const adWindow = window.open(adUrl, '_blank');
 
     setLeaving(true);
     setAdHint(null);
 
-    try {
-      // 1) Obtener el link ANTES de sellar. Si se sella primero y esto falla,
-      //    el usuario queda con el reloj corriendo sin haber visto el anuncio
-      //    y la UI le pide "permanece más segundos" sin motivo.
-      const response = await axios.get('/api/get-redirect-link');
-      const adUrl = response.data?.url;
-      if (!adUrl) throw new Error('Sin URL de anuncio');
+    // Sellar la salida en el servidor (autoridad de los 7s). keepalive permite
+    // que la petición sobreviva aunque la pestaña navegue en el fallback.
+    const stamped = fetch('/api/session/ad-visit', { method: 'POST', keepalive: true });
 
-      // 2) Ahora sí, sellar la salida (server-side, es la autoridad de los 7s)
-      await axios.post('/api/session/ad-visit');
+    if (!adWindow) {
+      // Popup bloqueado (común en móvil): misma pestaña, regreso con el botón
+      // atrás. pageshow/focus revalidan el estado al volver.
+      stamped
+        .catch(() => {})
+        .finally(() => {
+          window.location.href = adUrl;
+        });
+      return;
+    }
 
-      if (!adWindow) {
-        // Fallback universal: misma pestaña, regreso manual con atrás.
-        window.location.href = adUrl;
+    // Cierre automático a los 7s. Deadline real en vez de restar por tick:
+    // esta pestaña queda en segundo plano y ahí los navegadores ralentizan
+    // los timers, lo que desfasaría la cuenta.
+    const deadline = Date.now() + AD_SECONDS * 1000;
+    setAdCountdown(AD_SECONDS);
+
+    if (adTimerRef.current) clearInterval(adTimerRef.current);
+    adTimerRef.current = setInterval(() => {
+      const msLeft = deadline - Date.now();
+
+      if (msLeft > 0) {
+        setAdCountdown(Math.ceil(msLeft / 1000));
         return;
       }
 
-      adWindow.location.href = adUrl;
-
-      // 3) Cierre automático a los 7s. Se calcula contra un DEADLINE real y no
-      //    restando 1 por tick: nuestra pestaña queda en segundo plano y los
-      //    navegadores ralentizan los timers ahí, lo que desfasaría la cuenta.
-      const deadline = Date.now() + AD_SECONDS * 1000;
-      setAdCountdown(AD_SECONDS);
-
       if (adTimerRef.current) clearInterval(adTimerRef.current);
-      adTimerRef.current = setInterval(() => {
-        const msLeft = deadline - Date.now();
-
-        if (msLeft > 0) {
-          setAdCountdown(Math.ceil(msLeft / 1000));
-          return;
-        }
-
-        if (adTimerRef.current) clearInterval(adTimerRef.current);
-        adTimerRef.current = null;
-        try {
-          adWindow.close();
-        } catch {
-          // Si el navegador no permite cerrarla (algunos móviles), el usuario
-          // vuelve con atrás y pageshow/focus revalidan el estado.
-        }
-        setAdCountdown(null);
-        setLeaving(false);
-        refreshStatus();
-      }, 250);
-    } catch (error) {
-      console.error('No se pudo abrir el anuncio', error);
+      adTimerRef.current = null;
       try {
-        adWindow?.close();
-      } catch {}
+        adWindow.close();
+      } catch {
+        // Si el navegador no permite cerrarla (algunos móviles), el usuario
+        // vuelve con atrás y pageshow/focus revalidan el estado.
+      }
       setAdCountdown(null);
-      setAdHint('No se pudo abrir el anuncio. Inténtalo de nuevo.');
       setLeaving(false);
-    }
+      // El link se consume: al repetir el paso se pedirá uno nuevo (y cuenta
+      // como otra vista).
+      setAdUrl(null);
+      refreshStatus();
+    }, 250);
   };
 
   return (
@@ -208,9 +229,13 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
-                    <button onClick={handleVisitAd} disabled={leaving} className="btn-primary w-full text-lg">
+                    <button
+                      onClick={handleVisitAd}
+                      disabled={leaving || !adUrl}
+                      className="btn-primary w-full text-lg"
+                    >
                       <AnnouncementIcon className="w-5 h-5" />
-                      {leaving ? 'Abriendo anuncio…' : 'Ver anuncio'}
+                      {leaving ? 'Abriendo anuncio…' : !adUrl ? 'Cargando anuncio…' : 'Ver anuncio'}
                     </button>
                     <p className="text-sm text-zinc-500">
                       Se abrirá un anuncio durante{' '}
