@@ -14,11 +14,17 @@ export default function Document() {
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('Monetag Service Worker registration successful');
+                    function() {
+                      console.log('Service Worker registrado');
                     },
                     function(err) {
-                      console.log('Monetag Service Worker registration failed: ', err);
+                      console.log('Fallo al registrar el Service Worker:', err);
+                      // Si no se pudo registrar, retirar cualquier SW anterior:
+                      // uno roto de una visita previa seguiria interceptando
+                      // navegaciones y haria parecer el sitio caido.
+                      navigator.serviceWorker.getRegistrations().then(function(regs) {
+                        regs.forEach(function(r) { r.unregister(); });
+                      });
                     }
                   );
                 });

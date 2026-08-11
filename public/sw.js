@@ -1,29 +1,36 @@
-// Monetag Service Worker
-// Este archivo permite que Monetag verifique la propiedad del dominio
+// Service Worker de Monetag (verificación de dominio + push).
+//
+// IMPORTANTE: importScripts() es SÍNCRONO y se ejecuta antes que cualquier
+// listener. Si el CDN de Monetag no responde —cosa que pasa: sus dominios
+// rotan y los bloqueadores los filtran— la excepción aborta el script entero,
+// el Service Worker no llega a instalarse y, si ya había uno activo de una
+// visita anterior, puede quedarse interceptando navegaciones y hacer que el
+// sitio parezca caído aunque el servidor esté perfecto.
+//
+// Por eso el import va dentro de try/catch: si Monetag no carga, el sitio
+// sigue funcionando y solo se pierde la parte publicitaria.
 
 self.options = {
-  "domain": "3nbf4.com",
-  "zoneId": 10611671
+  domain: '3nbf4.com',
+  zoneId: 10611671,
 };
 
-self.lary = "";
+self.lary = '';
 
-// Importar el service worker de Monetag
-importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw');
+try {
+  importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw');
+} catch (error) {
+  console.warn('No se pudo cargar el Service Worker de Monetag:', error);
+}
 
-// Evento de instalación
-self.addEventListener('install', (event) => {
-  console.log('Monetag Service Worker installed');
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Evento de activación
 self.addEventListener('activate', (event) => {
-  console.log('Monetag Service Worker activated');
-  event.waitUntil(clients.claim());
+  event.waitUntil(self.clients.claim());
 });
 
-// Evento de fetch para interceptar requests
-self.addEventListener('fetch', (event) => {
-  // El SW de Monetag maneja las requests automáticamente
-});
+// Sin listener 'fetch' propio: uno vacío no aporta nada y mete al Service
+// Worker en el camino de cada navegación sin motivo. El SW de Monetag
+// registra el suyo si carga bien.
